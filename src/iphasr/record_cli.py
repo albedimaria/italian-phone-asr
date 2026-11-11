@@ -25,11 +25,13 @@ def _client():
     return Client(os.environ["TWILIO_ACCOUNT_SID"], os.environ["TWILIO_AUTH_TOKEN"])
 
 
-def ngrok_url() -> str | None:
+def ngrok_url(port: int = 8731) -> str | None:
+    """Public https URL of an ngrok tunnel forwarding to *our* port (not another project's)."""
     try:
         with urllib.request.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=2) as r:
             tunnels = json.load(r)["tunnels"]
-        return next(t["public_url"] for t in tunnels if t["public_url"].startswith("https"))
+        return next(t["public_url"] for t in tunnels
+                    if t["public_url"].startswith("https") and t["config"]["addr"].endswith(f":{port}"))
     except Exception:
         return None
 
@@ -71,13 +73,13 @@ def serve(port: int = 8731, local: bool = False) -> int:
         os.environ.setdefault("RECORDER_PUBLIC_URL", f"http://127.0.0.1:{port}")
         uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning")
         return 0
-    url = ngrok_url()
+    url = ngrok_url(port)
     proc = None
     if not url:
         proc = subprocess.Popen(["ngrok", "http", str(port), "--log", "stdout"], stdout=subprocess.DEVNULL)
         for _ in range(40):
             time.sleep(0.25)
-            if url := ngrok_url():
+            if url := ngrok_url(port):
                 break
     if not url:
         print("ngrok did not start")
