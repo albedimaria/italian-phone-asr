@@ -3,6 +3,7 @@
     bench report               rebuild results/table.md from cached transcripts (no network); gate
     bench preflight            secret/audio sweep before every push
     bench synth-text N         write the train_synth sentence list (no audio)
+    bench prepare SET          build a manifest (test_collaudio)
     bench record ...           test_human sessions: setup | serve | new | call | fetch
 """
 
@@ -21,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("synth-text", help="write train_synth sentences to the data root")
     p.add_argument("n", type=int)
     p.add_argument("--seed", type=int, default=0)
+    p = sub.add_parser("prepare", help="build a test/train manifest under the data root")
+    p.add_argument("set", choices=["test_collaudio"])
     from .record_cli import add_parser as add_record
     add_record(sub)
     args = ap.parse_args(argv)
@@ -37,6 +40,11 @@ def main(argv: list[str] | None = None) -> int:
         out = data_root() / "synth" / "sentences.jsonl"
         write_jsonl(out, generate(args.n, args.seed))
         print(f"wrote {args.n} sentences to {out}")
+        return 0
+    if args.cmd == "prepare":
+        from .data import prepare_collaudio
+        rows = prepare_collaudio()
+        print(f"test_collaudio: {len(rows)} utts, {sum(r['duration'] for r in rows) / 60:.1f} min")
         return 0
     if args.cmd == "record":
         from .record_cli import run
