@@ -1,0 +1,32 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+uv.toml
+.env
+.env.*
+!.env.example
+# audio and datasets never go in the repo
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.opus
+*.ulaw
+*.m4a
+*.webm
+data/raw/
+data/audio/
+data/test_human/
+results/transcripts/
+results/private/
+recorder/sessions/
+checkpoints/
+outputs/
+*.safetensors
+*.bin
+
+# internal planning doc (Italian, personal), not published
+SPEC.md
+NOTES-private.md
+.claude/

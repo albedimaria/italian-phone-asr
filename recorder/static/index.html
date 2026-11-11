@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registrazione frasi</title>
+<style>
+  :root { --bg:#f6f5f2; --ink:#1d1d1b; --muted:#5b5a55; --line:#d9d6cf; --go:#1f6b45; --wait:#8a5a00; --card:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:18px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 8px; }
+  p, li { color: var(--ink); }
+  .muted { color: var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin:20px 0; }
+  ul { padding-left: 20px; }
+  label { display:flex; gap:12px; align-items:flex-start; cursor:pointer; }
+  input[type=checkbox] { width:22px; height:22px; margin-top:3px; flex:none; }
+  button { font:inherit; font-weight:600; border-radius:10px; border:1px solid var(--ink); padding:14px 22px; min-height:52px; cursor:pointer; background:var(--ink); color:#fff; }
+  button.secondary { background:transparent; color:var(--ink); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .progress { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-bottom:24px; }
+  .bar > div { height:100%; background:var(--go); width:0; transition:width .3s; }
+  .sentence { font-size: 30px; line-height:1.35; font-weight:500; min-height: 5.5em; padding: 24px; background:var(--card); border:1px solid var(--line); border-radius:12px; }
+  .pill { font-size:16px; font-weight:700; padding:6px 12px; border-radius:999px; }
+  .pill.wait { background:#f6e7c8; color:var(--wait); }
+  .pill.go { background:#d5eadd; color:var(--go); }
+  .keys { font-size:16px; color:var(--muted); margin-top:12px; }
+  kbd { border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 6px; background:#fff; font-size:15px; }
+  [hidden] { display:none !important; }
+  @media (max-width: 520px) { .sentence { font-size: 24px; } }
+</style>
+</head>
+<body>
+<main>
+  <section id="intro">
+    <h1>Lettura di frasi al telefono</h1>
+    <p class="muted">Circa 10 minuti. Leggerai 108 frasi brevi, una alla volta, come in una telefonata.</p>
+    <div class="card">
+      <ul>
+        <li>Stanza tranquilla, niente cuffie con microfono lontano: va bene il microfono del portatile o del telefono.</li>
+        <li>Leggi con calma e in modo naturale, come parleresti a un call center.</li>
+        <li>I <b>numeri di telefono</b> leggili <b>cifra per cifra</b> (tre, quattro, sette…). Tutto il resto come ti viene naturale.</li>
+        <li>Aspetta che compaia <span class="pill go">Leggi ora</span> prima di parlare.</li>
+        <li>Se sbagli o ti interrompi, premi <b>Ripeti</b>: la frase si registra di nuovo.</li>
+        <li>Puoi fermarti e riprendere più tardi dallo stesso link: si riparte da dove eri.</li>
+      </ul>
+    </div>
+    <div class="card" id="mobileNote" hidden>
+      <p><b>Registrazione dal cellulare.</b> Ti arriverà una chiamata. Tieni questa pagina aperta per leggere le frasi; sul tastierino del telefono premi <b>#</b> per passare alla frase dopo e <b>*</b> per ripeterla.</p>
+    </div>
+    <div class="card">
+      <label><input type="checkbox" id="consent">
+        <span>Ho letto e firmato il modulo di consenso. So che l'audio passa da Twilio e viene trascritto da Deepgram, ElevenLabs e OpenAI, che non viene pubblicato e che posso chiederne la cancellazione.</span></label>
+    </div>
+    <div class="row"><button id="start" disabled>Inizia la chiamata</button></div>
+    <p id="err" class="muted" role="alert"></p>
+  </section>
+
+  <section id="rec" hidden>
+    <div class="progress"><span id="count" class="muted">—</span><span id="state" class="pill wait">Attendi…</span></div>
+    <div class="bar"><div id="fill"></div></div>
+    <div class="sentence" id="sentence" aria-live="polite"></div>
+    <div class="row" style="margin-top:20px">
+      <button id="next" disabled>Avanti</button>
+      <button id="redo" class="secondary" disabled>Ripeti</button>
+      <button id="hang" class="secondary">Pausa (riattacca)</button>
+    </div>
+    <p class="keys" id="keys"><kbd>Spazio</kbd> avanti · <kbd>R</kbd> ripeti</p>
+  </section>
+
+  <section id="end" hidden>
+    <h1>Fatto, grazie!</h1>
+    <p>Le frasi sono tutte registrate. Puoi chiudere la pagina.</p>
+  </section>
+</main>
+<script src="{{SDK_URL}}"></script>
+<script>
+const TOKEN = "{{TOKEN}}", CHANNEL = "{{CHANNEL}}";
+const $ = (id) => document.getElementById(id);
+let lines = [], device = null, call = null, shown = -1, expected = null, busy = false;
+
+async function api(path) {
+  const r = await fetch(`/api/${TOKEN}/${path}`, { headers: { "ngrok-skip-browser-warning": "1" } });
+  if (!r.ok) throw new Error(`${path}: ${r.status}`);
+  return r.json();
+}
+
+function render(i, total, ready) {
+  shown = i;
+  $("count").textContent = `Frase ${Math.min(i + 1, total)} di ${total}`;
+  $("fill").style.width = `${(100 * i) / total}%`;
+  $("sentence").textContent = lines[i] ? lines[i].text : "";
+  $("state").className = "pill " + (ready ? "go" : "wait");
+  $("state").textContent = ready ? "Leggi ora" : "Attendi…";
+  const canAct = ready && CHANNEL === "browser" && call;
+  $("next").disabled = !canAct; $("redo").disabled = !canAct;
+}
+
+async function poll() {
+  try {
+    const st = await api("status");
+    if (st.finished) { finish(); return; }
+    const cur = st.current;
+    if (cur && (expected === null || cur.i === expected)) {
+      // the Record for this line is running on Twilio's side: small margin, then read
+      const age = Date.now() / 1000 - cur.since;
+      const ready = age > 0.4;
+      render(cur.i, st.total, ready);
+      if (ready) { busy = false; expected = null; }
+    } else if (!cur && shown < 0) {
+      render(st.done, st.total, false);
+    }
+  } catch (e) { $("err").textContent = e.message; }
+  setTimeout(poll, 250);
+}
+
+function press(d) {
+  if (!call || busy) return;
+  busy = true;
+  expected = d === "#" ? shown + 1 : shown;
+  $("next").disabled = true; $("redo").disabled = true;
+  $("state").className = "pill wait"; $("state").textContent = "Attendi…";
+  call.sendDigits(d);
+}
+
+function finish() {
+  $("rec").hidden = true; $("intro").hidden = true; $("end").hidden = false;
+  if (call) call.disconnect();
+}
+
+async function startCall() {
+  $("err").textContent = "";
+  $("start").disabled = true;
+  try {
+    const { token } = await api("voice-token");
+    device = new Twilio.Device(token, { codecPreferences: ["pcmu"], logLevel: "warn" });  // G.711 mu-law only
+    call = await device.connect({ params: { session: TOKEN } });
+    call.on("disconnect", () => { call = null; $("next").disabled = true; $("redo").disabled = true;
+      $("state").className = "pill wait"; $("state").textContent = "Chiamata chiusa: ricarica la pagina per riprendere"; });
+    call.on("error", (e) => { $("err").textContent = "Errore chiamata: " + e.message; });
+    $("intro").hidden = true; $("rec").hidden = false;
+  } catch (e) {
+    $("err").textContent = "Non riesco ad avviare la chiamata: " + e.message;
+    $("start").disabled = false;
+  }
+}
+
+(async function init() {
+  lines = await api("script");
+  if (CHANNEL === "mobile") {
+    $("mobileNote").hidden = false; $("start").textContent = "Mostra le frasi"; $("keys").hidden = true;
+    $("next").hidden = true; $("redo").hidden = true; $("hang").hidden = true;
+  }
+  $("consent").addEventListener("change", (e) => { $("start").disabled = !e.target.checked; });
+  $("start").addEventListener("click", () => {
+    if (CHANNEL === "mobile") { $("intro").hidden = true; $("rec").hidden = false; } else startCall();
+  });
+  $("next").addEventListener("click", () => press("#"));
+  $("redo").addEventListener("click", () => press("*"));
+  $("hang").addEventListener("click", () => { if (call) call.disconnect(); });
+  document.addEventListener("keydown", (e) => {
+    if ($("rec").hidden) return;
+    if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); if (!$("next").disabled) press("#"); }
+    if (e.key === "r" || e.key === "R") { if (!$("redo").disabled) press("*"); }
+  });
+  poll();
+})();
+</script>
+</body>
+</html>

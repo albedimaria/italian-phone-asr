@@ -1,0 +1,112 @@
+# Copione di test (test_human). Una frase per riga, entità annotate come [testo|tipo].
+# Tipi: prezzo, data, orario, auto, nome, telefono, numero.
+# Il riferimento è il testo mostrato; il normalizzatore lo porta in lettere.
+# I valori delle entità qui NON devono comparire in train_synth (tests/test_leak.py).
+Buongiorno, vorrei prenotare un test drive della [Peugeot 208|auto].
+Ho visto online una [Fiat Tipo|auto] a [14.900 euro|prezzo], è ancora disponibile?
+Potrei passare giovedì [18 dicembre|data] verso le [15:30|orario].
+Mi chiamo [Giulia Ferraresi|nome], con due erre.
+Il mio numero è [347 281 9063|telefono].
+Quanto costa il tagliando per una [Volkswagen Polo|auto] del [2019|numero]?
+La macchina ha [86.500|numero] chilometri.
+Vorrei sapere se accettate la permuta della mia [Opel Corsa|auto].
+Il preventivo che mi avete mandato era di [1.250 euro|prezzo].
+Posso pagare in [36|numero] rate da [289 euro|prezzo]?
+L'appuntamento è fissato per il [3 febbraio|data] alle [9:45|orario].
+Mi richiami pure dopo le [18|orario], prima non riesco.
+Sto cercando una [Toyota Yaris|auto] ibrida usata, sotto i [13.000 euro|prezzo].
+Il cambio gomme costa [60 euro|prezzo] o è compreso nel prezzo?
+Avevo prenotato per lunedì [12 gennaio|data], ma devo spostare.
+Preferirei venerdì mattina, tra le 10 e le [11:30|orario].
+Sono [Alessandro Martinelli|nome], ho chiamato ieri per la [Jeep Renegade|auto].
+La rata mensile scende a [199 euro|prezzo] con un anticipo di [3.000 euro|prezzo].
+Mia moglie vorrebbe provare la [Renault Clio|auto] il [27 novembre|data].
+Ci vediamo alle [17:15|orario] in concessionaria.
+Mi può mandare il preventivo al numero [328 554 1270|telefono]?
+Quanti chilometri ha la [Dacia Sandero|auto] che avete in vetrina?
+Il prezzo di listino era [22.300 euro|prezzo], giusto?
+Vorrei un appuntamento per il [21 marzo|data], se possibile di pomeriggio.
+Mi chiamo [Francesca Lombardo|nome] e abito a Bergamo.
+L'assicurazione costa circa [540 euro|prezzo] all'anno.
+La [Citroën C3|auto] ha il cambio automatico?
+Vengo sabato [6 dicembre|data] alle 11.
+Ho un budget massimo di [18.500 euro|prezzo].
+Mi interessa la [Kia Picanto|auto] grigia del [2021|numero].
+La garanzia dura [24|numero] mesi o [36|numero]?
+Il mio cellulare è [339 760 4128|telefono], mi trova sempre.
+Potete farmi uno sconto di [500 euro|prezzo]?
+Il ritiro dell'auto è previsto per il [14 aprile|data].
+Sono [Davide Rinaldi|nome], avevo un appuntamento alle [16:40|orario].
+Quanto consuma la [Hyundai i20|auto] in città?
+Vorrei disdire la prenotazione di mercoledì [29 ottobre|data].
+La revisione costa [79 euro|prezzo]?
+Arrivo verso le [8:30|orario], prima di andare al lavoro.
+Buonasera, vorrei iscrivermi al corso di salsa del martedì.
+La lezione di prova è alle [20:15|orario]?
+L'abbonamento mensile costa [55 euro|prezzo]?
+Mi chiamo [Chiara Esposito|nome] e ho [34|numero] anni.
+Il corso inizia il [7 gennaio|data] e finisce a giugno.
+Siamo in due, io e mio marito [Stefano|nome].
+Posso pagare [120 euro|prezzo] per tutto il trimestre?
+Mi richiami al [351 902 3346|telefono] dopo cena.
+Vorrei spostare la lezione al [22 maggio|data].
+Pronto, mi sente? La linea è un po' disturbata.
+Scusi, può ripetere più lentamente?
+Sì, va benissimo, grazie mille per la disponibilità.
+No, preferisco essere contattato con un messaggio.
+Aspetti un attimo che prendo un foglio per scrivere.
+Mi conferma l'indirizzo della sede, per favore?
+Ho ricevuto la sua email ma non c'era l'allegato.
+Va bene, allora ci sentiamo la prossima settimana.
+Volevo parlare con il responsabile del reparto vendite.
+Mi scusi per il ritardo, c'era traffico in tangenziale.
+Il totale è [2.340 euro|prezzo], IVA compresa.
+Ho bisogno della macchina entro il [30 settembre|data].
+Lo sportello apre alle [8:15|orario] e chiude alle [19:30|orario].
+Ho trovato un'[Alfa Romeo Giulietta|auto] a [19.900 euro|prezzo].
+Il finanziamento è di [48|numero] mesi al [5,9%|numero].
+Mi chiamo [Roberto Gallo|nome], la targa gliela mando per messaggio.
+Domani alle [14:20|orario] sono libero.
+Il [2 giugno|data] siete aperti?
+La [Fiat 500|auto] elettrica costa [29.950 euro|prezzo]?
+Vorrei vedere la [Ford Puma|auto] prima di sabato.
+Ho pagato un acconto di [800 euro|prezzo] il [10 novembre|data].
+Il mio nome è [Elena Marchetti|nome], sono la cognata di [Paolo|nome].
+La consegna slitta al [19 febbraio|data]?
+Il bollo per quest'anno è di [312 euro|prezzo].
+Mi serve un'auto con almeno [5|numero] posti e un bagagliaio grande.
+La mia vecchia [Lancia Ypsilon|auto] ha [140.000|numero] chilometri.
+Posso venire il [25 gennaio|data] dopo le [17:45|orario]?
+La signora [Rossi|nome] ha lasciato il numero [342 118 7759|telefono].
+Il tagliando dei [30.000|numero] chilometri quanto costa?
+Ho visto la [Nissan Qashqai|auto] a [21.700 euro|prezzo], è trattabile?
+Vorrei prenotare per [4|numero] persone giovedì sera alle [21|orario].
+Il volo parte il [16 agosto|data] alle [6:50|orario].
+La bolletta di ottobre era di [87 euro e 40|prezzo].
+Il pacco arriva tra il 3 e il [5 marzo|data].
+Lo studio medico riceve il martedì dalle 9 alle [12:30|orario].
+Mi chiamo [Luca Moretti|nome] e chiamo per conto di mio padre.
+Il canone d'affitto è di [650 euro|prezzo] al mese.
+La riunione è spostata alle [10:15|orario] di lunedì [9 febbraio|data].
+Mi può richiamare allo [02 4857 3310|telefono]?
+Ho fatto un bonifico di [1.180 euro|prezzo] il [28 ottobre|data].
+Mi servirebbe il preventivo entro venerdì [23 gennaio|data].
+Sono [Sara Colombo|nome], cliente da più di [10|numero] anni.
+La [Skoda Octavia|auto] station wagon è ancora in vendita?
+A che ora chiudete il sabato, alle [12:45|orario] o alle 13?
+Il cliente ha chiesto uno sconto del [15%|numero].
+L'auto sostitutiva costa [35 euro|prezzo] al giorno.
+Mi è arrivata una multa di [167 euro|prezzo].
+La pratica si chiude il [31 dicembre|data].
+Mio figlio [Matteo|nome] compie [18|numero] anni a luglio.
+La [Mazda CX-30|auto] ha la trazione integrale?
+Le detto il numero: [380 625 4417|telefono].
+Vorrei sapere il costo totale, compreso il passaggio di proprietà.
+Il passaggio costa circa [400 euro|prezzo].
+Potrei venire il [primo dicembre|data], verso mezzogiorno.
+Ho un'offerta da un altro concessionario a [16.200 euro|prezzo].
+Mi chiamo [Andrea Fontana|nome], scritto con una sola enne.
+La [Volkswagen Golf|auto] del [2018|numero] ha già fatto il tagliando?
+Ci vediamo il [4 marzo|data] alle [15:10|orario], va bene?
+Il preventivo scade il [20 dicembre|data].
+Grazie, allora aspetto la sua chiamata domani mattina.
