@@ -2,7 +2,8 @@
 
 G.711 chain (training audio): any input -> 8 kHz mono -> mu-law encode -> decode -> 16 kHz PCM.
 test_collaudio: caller channel of Collaudio runs, silences trimmed, reference = the lines the
-tester actually spoke (events.json, customer_speech_start).
+tester actually spoke (events.json, customer_speech_start). The Twilio trial preamble at the start
+of the caller channel is cut.
 """
 
 from __future__ import annotations
@@ -76,7 +77,16 @@ def prepare_collaudio(runs: Path = COLLAUDIO_RUNS) -> list[dict]:
         if x.ndim != 2:
             continue
         ch = x[:, CUSTOMER_CH]
-        regions = speech_regions(ch, sr)
+        # The caller channel starts with the Twilio trial preamble ("Thank you for using your demo
+        # account..."), before the tester's media stream opens. Map stream time to recording time
+        # (both end at hangup) and drop every region that ends before the first scripted line.
+        stop_ms = next((e["t"] for e in events if e.get("type") == "stream_stop"), None)
+        first_ms = next(e["t"] for e in events if e.get("type") == "customer_speech_start")
+        if stop_ms is None:
+            continue
+        offset_s = len(ch) / sr - stop_ms / 1000
+        first_line_at = int((offset_s + first_ms / 1000) * sr)
+        regions = [(a, b) for a, b in speech_regions(ch, sr) if b > first_line_at]
         if not regions:
             continue
         gap = np.zeros(int(0.3 * sr), dtype=np.int16)
@@ -90,3 +100,77 @@ def prepare_collaudio(runs: Path = COLLAUDIO_RUNS) -> list[dict]:
                      "sample_rate": sr, "variant": run.name.split("-")[2]})
     write_jsonl(manifest_path("test_collaudio"), rows)
     return rows
+
+
+# --- Common Voice IT 27.0 ------------------------------------------------------------------
+
+CV_TAR = Path("D:/data/italian-phone-asr/raw/cv-it-27/common-voice-scripted-speech-27-0-italia-5ca1c1b9.tar.gz")
+TRAIN_HOURS, DEV_CLIPS, TEST_HOURS, MAX_PER_SPEAKER = 15.0, 600, 1.0, 25
+AVG_CLIP_S = 5.444  # from the MDC datasheet; real durations are measured on the clips we keep
+
+
+def _read_tsv(data: bytes) -> list[dict]:
+    import csv
+    import io
+    return list(csv.DictReader(io.StringIO(data.decode("utf-8")), delimiter="	", quoting=csv.QUOTE_NONE))
+
+
+def _pick(rows: list[dict], n: int, seed: int) -> list[dict]:
+    """Up to n clips, at most MAX_PER_SPEAKER per speaker, spread over as many speakers as possible."""
+    import random
+    rng = random.Random(seed)
+    rows = rows[:]
+    rng.shuffle(rows)
+    per: dict[str, int] = {}
+    out = []
+    for r in rows:
+        if per.get(r["client_id"], 0) >= MAX_PER_SPEAKER:
+            continue
+        per[r["client_id"]] = per.get(r["client_id"], 0) + 1
+        out.append(r)
+        if len(out) >= n:
+            break
+    return out
+
+
+def prepare_cv(tar_path: Path = CV_TAR) -> dict:
+    """One streaming pass over the tar: read the split TSVs, extract test_cv clips (kept local),
+    write cv_subset.json (train/dev clip lists for the Kaggle kernel) and the test_cv manifest."""
+    import tarfile
+
+    import soundfile as sf
+
+    tsv: dict[str, list[dict]] = {}
+    with tarfile.open(tar_path, "r|gz") as tar:
+        for m in tar:
+            name = Path(m.name).name
+            if m.isfile() and name in ("train.tsv", "dev.tsv", "test.tsv"):
+                tsv[name[:-4]] = _read_tsv(tar.extractfile(m).read())
+            if len(tsv) == 3:
+                break
+    train = _pick(tsv["train"], int(TRAIN_HOURS * 3600 / AVG_CLIP_S), seed=0)
+    dev = _pick(tsv["dev"], DEV_CLIPS, seed=1)
+    test = _pick(tsv["test"], int(TEST_HOURS * 3600 / AVG_CLIP_S), seed=2)
+    out_dir = data_root() / "test_cv" / "audio"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    want = {r["path"] for r in test}
+    with tarfile.open(tar_path, "r|gz") as tar:
+        for m in tar:
+            name = Path(m.name).name
+            if m.isfile() and name in want and not (out_dir / name).exists():
+                (out_dir / name).write_bytes(tar.extractfile(m).read())
+    rows = []
+    for r in test:
+        f = out_dir / r["path"]
+        if f.exists():
+            rows.append({"id": f"cv_{Path(r['path']).stem}", "audio": str(f), "text": r["sentence"],
+                         "duration": sf.info(str(f)).duration, "speaker": r["client_id"][:12]})
+    write_jsonl(manifest_path("test_cv"), rows)
+    subset = {"train": [r["path"] for r in train], "dev": [r["path"] for r in dev],
+              "meta": [{"path": r["path"], "sentence": r["sentence"]} for r in train + dev]}
+    dst = data_root() / "kaggle" / "cv_subset.json"
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(json.dumps(subset, ensure_ascii=False), encoding="utf-8")
+    return {"train": len(train), "dev": len(dev), "test_cv": len(rows),
+            "test_cv_min": round(sum(r["duration"] for r in rows) / 60, 1),
+            "train_speakers": len({r["client_id"] for r in train})}

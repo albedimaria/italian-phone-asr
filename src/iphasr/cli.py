@@ -4,6 +4,7 @@
     bench preflight            secret/audio sweep before every push
     bench synth-text N         write the train_synth sentence list (no audio)
     bench prepare SET          build a manifest (test_collaudio)
+    bench run SYSTEM SET       transcribe a test set (cached; cloud calls cost money)
     bench record ...           test_human sessions: setup | serve | new | call | fetch
 """
 
@@ -23,7 +24,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("n", type=int)
     p.add_argument("--seed", type=int, default=0)
     p = sub.add_parser("prepare", help="build a test/train manifest under the data root")
-    p.add_argument("set", choices=["test_collaudio"])
+    p.add_argument("set", choices=["test_collaudio", "cv"])
+    p = sub.add_parser("run", help="transcribe a test set with one system (cached, resumable)")
+    p.add_argument("system")
+    p.add_argument("set")
+    p.add_argument("--limit", type=int)
+    p.add_argument("--model-path")
     from .record_cli import add_parser as add_record
     add_record(sub)
     args = ap.parse_args(argv)
@@ -42,9 +48,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {args.n} sentences to {out}")
         return 0
     if args.cmd == "prepare":
+        if args.set == "cv":
+            from .data import prepare_cv
+            print(prepare_cv())
+            return 0
         from .data import prepare_collaudio
         rows = prepare_collaudio()
         print(f"test_collaudio: {len(rows)} utts, {sum(r['duration'] for r in rows) / 60:.1f} min")
+        return 0
+    if args.cmd == "run":
+        from .paths import SYSTEMS
+        from .systems import run
+        if args.system not in SYSTEMS:
+            ap.error(f"unknown system; choose from {list(SYSTEMS)}")
+        print(run(args.system, args.set, args.limit, model_path=args.model_path))
         return 0
     if args.cmd == "record":
         from .record_cli import run

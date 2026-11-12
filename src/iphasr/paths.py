@@ -12,7 +12,7 @@ RESULTS = REPO / "results"
 SETS = ["test_human", "test_cv", "test_collaudio"]
 SYSTEMS = {
     "deepgram-nova-3": "Deepgram Nova-3",
-    "elevenlabs-scribe-v2": "ElevenLabs Scribe v2",
+    "elevenlabs-scribe": "ElevenLabs Scribe v3",
     "openai-gpt-transcribe": "OpenAI gpt-transcribe",
     "parakeet-tdt-0.6b-v3": "NVIDIA Parakeet-TDT-0.6B-v3",
     "whisper-small": "Whisper-small (base)",
