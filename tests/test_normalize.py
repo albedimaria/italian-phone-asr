@@ -42,6 +42,7 @@ from iphasr.normalize import normalize
     ("il 18 dicembre", "il diciotto dicembre"),
     ("il 1 dicembre", "il primo dicembre"),
     ("il 1° dicembre", "il primo dicembre"),
+    ("il 1º orario", "il primo orario"),
     ("il primo dicembre", "il primo dicembre"),
     ("l'11 marzo", "l undici marzo"),
     # phone numbers: digit by digit, whatever the grouping

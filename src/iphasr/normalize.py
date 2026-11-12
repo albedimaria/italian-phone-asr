@@ -165,7 +165,9 @@ def _token_fixes(tokens: list[str]) -> list[str]:
 
 def normalize(text: str) -> str:
     """Normalize Italian text for WER. Returns space-separated lowercase tokens."""
-    s = unicodedata.normalize("NFKC", text).lower()
+    # NFKC maps the ordinal indicators º/ª to plain "o"/"a" ("1º" -> "1o"): unify them with ° first
+    s = text.replace("º", "°").replace("ª", "°")
+    s = unicodedata.normalize("NFKC", s).lower()
     s = s.replace("’", "'").replace("‘", "'").replace("`", "'")
     s = s.replace(" ", " ")
     s = _CUR_BEFORE.sub(_currency, s)
