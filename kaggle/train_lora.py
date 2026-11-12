@@ -37,7 +37,7 @@ TMP = Path("/kaggle/tmp")
 TMP.mkdir(parents=True, exist_ok=True)
 CFG = {
     "round": 1, "lora_r": 32, "lora_alpha": 64, "lora_dropout": 0.05, "target_modules": ["q_proj", "v_proj"],
-    "lr": 1e-3, "epochs": 3, "batch_size": 16, "grad_accum": 1, "synth_fraction": 1.0, "warmup_steps": 100,
+    "lr": 1e-3, "epochs": 3, "batch_size": 8, "grad_accum": 2, "synth_fraction": 1.0, "warmup_steps": 100,
     "eval_steps": 300, "save_steps": 300, "seed": 0,
 }
 if (IN / "config.json").exists():
@@ -195,7 +195,7 @@ args = Seq2SeqTrainingArguments(
     output_dir=str(WORK / "ckpt"), per_device_train_batch_size=CFG["batch_size"],
     gradient_accumulation_steps=CFG["grad_accum"], learning_rate=CFG["lr"], warmup_steps=CFG["warmup_steps"],
     num_train_epochs=CFG["epochs"], fp16=True, eval_strategy="steps", eval_steps=CFG["eval_steps"],
-    save_steps=CFG["save_steps"], save_total_limit=2, logging_steps=50, per_device_eval_batch_size=16,
+    save_steps=CFG["save_steps"], save_total_limit=2, logging_steps=50, per_device_eval_batch_size=8,
     remove_unused_columns=False, label_names=["labels"], report_to=[], dataloader_num_workers=2,
     load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
 )
