@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Fine-tuning and benchmarking ASR on 8 kHz G.711 Italian phone speech, with entity accuracy."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.11"
 dependencies = [
     "jiwer>=3.1",
     "num2words>=0.5.14",
