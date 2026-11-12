@@ -15,6 +15,8 @@ import os
 import subprocess
 import sys
 
+# the image ships torchao 0.10, which recent PEFT rejects at LoRA injection: remove it (not used here)
+subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "-q", "torchao"], check=False)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "peft>=0.13", "jiwer>=3.1", "num2words>=0.5.14",
                 "git+https://github.com/albedimaria/italian-phone-asr.git"], check=True)
 
@@ -123,33 +125,7 @@ from transformers import WhisperForConditionalGeneration, WhisperProcessor
 BASE = "openai/whisper-small"
 processor = WhisperProcessor.from_pretrained(BASE, language="italian", task="transcribe")
 
-FEAT = TMP / "features"
-FEAT.mkdir(exist_ok=True)
-
-def featurize(split):
-    out = FEAT / f"{split}.pt"
-    if out.exists():
-        return torch.load(out)
-    feats = []
-    for k, r in enumerate(rows[split]):
-        audio = g711_16k(r["audio"]) if r["loader"] == "g711" else ulaw_16k(r["audio"])
-        if len(audio) > 30 * 16000:
-            continue
-        x = processor.feature_extractor(audio, sampling_rate=16000, return_tensors="np").input_features[0]
-        y = processor.tokenizer(r["text"]).input_ids
-        feats.append({"input_features": torch.tensor(x, dtype=torch.float16), "labels": y, "kind": r["kind"],
-                      "text": r["text"]})
-        if k % 1000 == 0:
-            print(split, k, len(rows[split]), flush=True)
-    torch.save(feats, out)
-    return feats
-
-train_feats, dev_feats = featurize("train"), featurize("dev")
-
-# %% [markdown]
-# ## LoRA on q/v projections
-
-# %%
+# build the LoRA model before any data work, so a library problem fails in a minute, not after featurizing
 from peft import LoraConfig, get_peft_model
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 
@@ -164,6 +140,41 @@ model = get_peft_model(model, lora)
 model.print_trainable_parameters()
 
 
+
+FEAT = TMP / "features"
+FEAT.mkdir(exist_ok=True)
+
+def _one(r):
+    audio = g711_16k(r["audio"]) if r["loader"] == "g711" else ulaw_16k(r["audio"])
+    if len(audio) > 30 * 16000:
+        return None
+    x = processor.feature_extractor(audio, sampling_rate=16000, return_tensors="np").input_features[0]
+    return {"input_features": torch.tensor(x, dtype=torch.float16), "labels": processor.tokenizer(r["text"]).input_ids,
+            "kind": r["kind"], "text": r["text"]}
+
+
+def featurize(split):
+    """ffmpeg per clip is the bottleneck (47 min serial for 12k clips): fan out over all CPUs."""
+    from concurrent.futures import ThreadPoolExecutor
+    out = FEAT / f"{split}.pt"
+    if out.exists():
+        return torch.load(out, weights_only=False)
+    feats = []
+    with ThreadPoolExecutor(max_workers=os.cpu_count() * 2) as ex:
+        for k, f in enumerate(ex.map(_one, rows[split], chunksize=32)):
+            if f is not None:
+                feats.append(f)
+            if k % 2000 == 0:
+                print(split, k, len(rows[split]), flush=True)
+    torch.save(feats, out)
+    return feats
+
+train_feats, dev_feats = featurize("train"), featurize("dev")
+
+# %% [markdown]
+# ## LoRA on q/v projections
+
+# %%
 class Collator:
     def __call__(self, batch):
         x = torch.stack([b["input_features"].float() for b in batch])
