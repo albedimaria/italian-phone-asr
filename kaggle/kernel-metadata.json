@@ -1,0 +1,14 @@
+{
+  "id": "holasoyalberto/whisper-small-it-phone-lora",
+  "title": "whisper-small-it-phone-lora",
+  "code_file": "train_lora.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": ["holasoyalberto/ipasr-train"],
+  "competition_sources": [],
+  "kernel_sources": []
+}

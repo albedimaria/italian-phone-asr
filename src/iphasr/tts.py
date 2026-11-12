@@ -82,3 +82,36 @@ def synthesize(limit: int | None = None, seed: int = 0) -> list[dict]:
             print(f"{len(rows)}/{len(sentences)}  {sum(r['duration'] for r in rows) / 3600:.2f} h", flush=True)
     write_jsonl(manifest_path("train_synth"), rows)
     return rows
+
+
+def roundtrip_filter(max_wer: float = 0.10) -> dict:
+    """Transcribe every synth clip with Parakeet; keep clips whose entities all survive and WER <= max_wer.
+
+    TTS voices garble some inputs (long compound numbers, names): a wrong label teaches the model
+    the wrong thing, so those clips are dropped. Writes manifests/train_synth_clean.jsonl.
+    """
+    from .metrics import entity_accuracy, utt_counts
+    from .systems import Parakeet
+
+    rows = read_jsonl(manifest_path("train_synth"))
+    cache = data_root() / "synth" / "roundtrip.jsonl"
+    done = {r["id"]: r["hyp"] for r in read_jsonl(cache)}
+    p = Parakeet()
+    with cache.open("a", encoding="utf-8") as f:
+        import json
+        for r in rows:
+            if r["id"] not in done:
+                done[r["id"]] = p.batch([r["audio"]])[0]
+                f.write(json.dumps({"id": r["id"], "hyp": done[r["id"]]}, ensure_ascii=False) + "\n")
+    keep, stats = [], {}
+    for r in rows:
+        c = utt_counts(r["text"], done[r["id"]])
+        acc = entity_accuracy([(r["entities"], done[r["id"]])]).get("all", (0, 0))
+        ok = c.ref_len > 0 and c.errors / c.ref_len <= max_wer and acc[0] == acc[1]
+        s = stats.setdefault(r["voice"], [0, 0])
+        s[0] += ok; s[1] += 1
+        if ok:
+            keep.append({**r, "roundtrip_wer": round(c.errors / c.ref_len, 3)})
+    write_jsonl(manifest_path("train_synth_clean"), keep)
+    return {"kept": len(keep), "of": len(rows), "hours": round(sum(r["duration"] for r in keep) / 3600, 2),
+            "by_voice": {v: f"{a}/{b}" for v, (a, b) in stats.items()}}

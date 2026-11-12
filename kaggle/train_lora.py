@@ -28,7 +28,8 @@ import numpy as np
 import requests
 import torch
 
-IN = Path("/kaggle/input/ipasr-train")
+# the mount path of an attached dataset varies between Kaggle images: locate it by content
+IN = next(p.parent for p in Path("/kaggle/input").rglob("cv_subset.json"))
 WORK = Path("/kaggle/working")
 TMP = Path("/kaggle/tmp")
 TMP.mkdir(parents=True, exist_ok=True)
@@ -101,7 +102,7 @@ for split in ("train", "dev"):
         f = CV_DIR / p
         if f.exists():
             rows[split].append({"audio": str(f), "text": cv_meta[p]["sentence"], "kind": "cv", "loader": "g711"})
-synth = read_jsonl(IN / "train_synth.jsonl")
+synth = read_jsonl(IN / "train_synth.jsonl")  # round-trip-filtered clips only
 random.Random(0).shuffle(synth)
 n_dev = 200
 for r in synth[:n_dev]:
