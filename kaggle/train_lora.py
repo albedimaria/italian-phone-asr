@@ -37,7 +37,7 @@ TMP = Path("/kaggle/tmp")
 TMP.mkdir(parents=True, exist_ok=True)
 CFG = {
     "round": 1, "lora_r": 32, "lora_alpha": 64, "lora_dropout": 0.05, "target_modules": ["q_proj", "v_proj"],
-    "lr": 1e-3, "epochs": 3, "batch_size": 8, "grad_accum": 2, "synth_fraction": 1.0, "warmup_steps": 100,
+    "lr": 2e-4, "epochs": 3, "batch_size": 8, "grad_accum": 2, "synth_fraction": 1.0, "warmup_steps": 100,
     "eval_steps": 300, "save_steps": 300, "seed": 0,
     # round 2: keep the checkpoint with the lowest dev WER (generated text), not the lowest eval loss.
     # Round 1 picked by loss and drifted on a frequent word ("buongiorno" -> "bongiorno") at lr 1e-3.
