@@ -39,6 +39,9 @@ CFG = {
     "round": 1, "lora_r": 32, "lora_alpha": 64, "lora_dropout": 0.05, "target_modules": ["q_proj", "v_proj"],
     "lr": 1e-3, "epochs": 3, "batch_size": 8, "grad_accum": 2, "synth_fraction": 1.0, "warmup_steps": 100,
     "eval_steps": 300, "save_steps": 300, "seed": 0,
+    # round 2: keep the checkpoint with the lowest dev WER (generated text), not the lowest eval loss.
+    # Round 1 picked by loss and drifted on a frequent word ("buongiorno" -> "bongiorno") at lr 1e-3.
+    "select_by": "wer", "eval_subset": 400,
 }
 if (IN / "config.json").exists():
     CFG.update(json.loads((IN / "config.json").read_text()))
@@ -191,16 +194,32 @@ class DS(torch.utils.data.Dataset):
     def __getitem__(self, i): return self.f[i]
 
 
+from iphasr.metrics import corpus_wer
+
+by_wer = CFG["select_by"] == "wer"
+# a fixed random slice of dev keeps each in-training generate pass to a few minutes
+eval_feats = random.Random(1).sample(dev_feats, min(CFG["eval_subset"], len(dev_feats))) if by_wer else dev_feats
+
+
+def compute_metrics(pred):
+    ids = pred.label_ids.copy()
+    ids[ids == -100] = processor.tokenizer.pad_token_id
+    refs = processor.batch_decode(ids, skip_special_tokens=True)
+    hyps = processor.batch_decode(pred.predictions, skip_special_tokens=True)
+    return {"wer": corpus_wer(refs, hyps)}
+
+
 args = Seq2SeqTrainingArguments(
     output_dir=str(WORK / "ckpt"), per_device_train_batch_size=CFG["batch_size"],
     gradient_accumulation_steps=CFG["grad_accum"], learning_rate=CFG["lr"], warmup_steps=CFG["warmup_steps"],
     num_train_epochs=CFG["epochs"], fp16=True, eval_strategy="steps", eval_steps=CFG["eval_steps"],
     save_steps=CFG["save_steps"], save_total_limit=2, logging_steps=50, per_device_eval_batch_size=8,
     remove_unused_columns=False, label_names=["labels"], report_to=[], dataloader_num_workers=2,
-    load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
+    load_best_model_at_end=True, metric_for_best_model="eval_wer" if by_wer else "eval_loss",
+    greater_is_better=False, predict_with_generate=by_wer, generation_max_length=200,
 )
-trainer = Seq2SeqTrainer(model=model, args=args, train_dataset=DS(train_feats), eval_dataset=DS(dev_feats),
-                         data_collator=Collator())
+trainer = Seq2SeqTrainer(model=model, args=args, train_dataset=DS(train_feats), eval_dataset=DS(eval_feats),
+                         data_collator=Collator(), compute_metrics=compute_metrics if by_wer else None)
 last = None
 if (WORK / "ckpt").exists():
     cks = sorted((WORK / "ckpt").glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[1]))
@@ -211,8 +230,6 @@ trainer.train(resume_from_checkpoint=last)
 # ## Dev WER with the project's normalizer, then merge and save
 
 # %%
-from iphasr.metrics import corpus_wer
-
 model.eval()
 model.config.use_cache = True
 
