@@ -88,6 +88,31 @@ TEMPLATES = [
 ]
 _SLOT = re.compile(r"\{(\w+)\}")
 
+# Round 3: phone openers/closers. Round 1-2 had none, and the fine-tuned model lost Whisper's
+# spelling of the most frequent phone word ("buongiorno" -> "bongiorno"/"bun giorno").
+OPENERS = [
+    "Buongiorno,", "Buongiorno,", "Buongiorno,", "Sì, buongiorno,", "Pronto, buongiorno,",
+    "Buongiorno a lei,", "Buonasera,", "Salve,", "Pronto,", "Ah, buongiorno,",
+]
+CLOSERS = [
+    "Grazie, buongiorno.", "Grazie, buona giornata.", "Va bene, arrivederci.", "La ringrazio, arrivederci.",
+    "D'accordo, buonasera.", "Ok, grazie a lei.", "Benissimo, buona giornata.", "Grazie ancora, arrivederci.",
+]
+WRAP_OPEN_P, WRAP_CLOSE_P = 0.35, 0.25
+
+
+def _wrap(item: dict, rng: random.Random) -> dict:
+    """Add a phone opener and/or closer. Wrapped items get a new id so their audio is re-rendered."""
+    op = rng.choice(OPENERS) if rng.random() < WRAP_OPEN_P else None
+    cl = rng.choice(CLOSERS) if rng.random() < WRAP_CLOSE_P else None
+    if not (op or cl):
+        return item
+    def w(s: str) -> str:
+        if op:
+            s = f"{op} {s[0].lower()}{s[1:]}"
+        return f"{s} {cl}" if cl else s
+    return {**item, "id": item["id"] + "w", "text": w(item["text"]), "tts_text": w(item["tts_text"])}
+
 
 @lru_cache(maxsize=1)
 def test_blocklist() -> frozenset[str]:
@@ -144,8 +169,9 @@ def _fill(slot: str, rng: random.Random) -> tuple[str, str | None]:
     raise KeyError(slot)
 
 
-def generate(n: int, seed: int = 0) -> list[dict]:
+def generate(n: int, seed: int = 0, wrap: bool = True) -> list[dict]:
     rng = random.Random(seed)
+    wrap_rng = random.Random(seed + 10_000)  # separate stream: unwrapped items stay identical to round 1-2
     block = test_blocklist()
     out = []
     while len(out) < n:
@@ -165,5 +191,6 @@ def generate(n: int, seed: int = 0) -> list[dict]:
             spoken = spoken.replace("{" + slot + "}", normalize(val) if typ else val, 1)
             if typ:
                 ents.append({"type": typ, "text": val})
-        out.append({"id": f"synth{len(out):05d}", "text": written, "tts_text": spoken, "entities": ents})
+        item = {"id": f"synth{len(out):05d}", "text": written, "tts_text": spoken, "entities": ents}
+        out.append(_wrap(item, wrap_rng) if wrap else item)
     return out
