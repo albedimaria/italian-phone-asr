@@ -108,14 +108,18 @@ for split in ("train", "dev"):
         if f.exists():
             rows[split].append({"audio": str(f), "text": cv_meta[p]["sentence"], "kind": "cv", "loader": "g711"})
 synth = read_jsonl(IN / "train_synth.jsonl")  # round-trip-filtered clips only
+# audio may sit in train_synth/ or in several uploaded parts (web upload caps file size): find it anywhere
+WAV = {w.name: w for w in Path("/kaggle/input").rglob("synth*.wav")}
+missing = [r["audio"] for r in read_jsonl(IN / "train_synth.jsonl") if Path(r["audio"]).name not in WAV]
+assert not missing, f"{len(missing)} synth clips not found, e.g. {missing[:3]}"
 random.Random(0).shuffle(synth)
 n_dev = 200
 for r in synth[:n_dev]:
-    rows["dev"].append({"audio": str(IN / "train_synth" / Path(r["audio"]).name), "text": r["text"], "kind": "synth",
+    rows["dev"].append({"audio": str(WAV[Path(r["audio"]).name]), "text": r["text"], "kind": "synth",
                         "loader": "ulaw"})
 keep = int(len(synth[n_dev:]) * CFG["synth_fraction"])
 for r in synth[n_dev:n_dev + keep]:
-    rows["train"].append({"audio": str(IN / "train_synth" / Path(r["audio"]).name), "text": r["text"], "kind": "synth",
+    rows["train"].append({"audio": str(WAV[Path(r["audio"]).name]), "text": r["text"], "kind": "synth",
                           "loader": "ulaw"})
 print({k: len(v) for k, v in rows.items()})
 
