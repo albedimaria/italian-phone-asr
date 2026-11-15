@@ -27,13 +27,17 @@ def _client():
 
 def ngrok_url(port: int = 8731) -> str | None:
     """Public https URL of an ngrok tunnel forwarding to *our* port (not another project's)."""
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=2) as r:
-            tunnels = json.load(r)["tunnels"]
-        return next(t["public_url"] for t in tunnels
-                    if t["public_url"].startswith("https") and t["config"]["addr"].endswith(f":{port}"))
-    except Exception:
-        return None
+    # another project's ngrok agent may already hold 4040: each agent takes the next free API port
+    for api in range(4040, 4050):
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{api}/api/tunnels", timeout=2) as r:
+                tunnels = json.load(r)["tunnels"]
+        except Exception:
+            continue
+        for t in tunnels:
+            if t["public_url"].startswith("https") and t["config"]["addr"].endswith(f":{port}"):
+                return t["public_url"]
+    return None
 
 
 def _set_env_var(key: str, value: str) -> None:
