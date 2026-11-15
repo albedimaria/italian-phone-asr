@@ -50,7 +50,9 @@ CFG = {
     "select_by": "wer", "eval_subset": 400,
     # augmentation: SpecAugment in the encoder + additive noise after the codec on half the train clips
     "spec_augment": True, "noise_p": 0.5, "noise_snr_db": [15, 35],
-    "max_hours": 10.5,   # Kaggle stops at 12 h: stop training early enough to evaluate and save
+    "max_hours": 10.5,
+    # ablation arm: "both" | "cv" (Common Voice through G.711 only) | "synth" (synthetic phone set only)
+    "data_mix": "both",   # Kaggle stops at 12 h: stop training early enough to evaluate and save
 }
 print(CFG)
 random.seed(CFG["seed"]); np.random.seed(CFG["seed"]); torch.manual_seed(CFG["seed"])
@@ -128,6 +130,8 @@ keep = int(len(synth[n_dev:]) * CFG["synth_fraction"])
 for r in synth[n_dev:n_dev + keep]:
     rows["train"].append({"audio": str(WAV[Path(r["audio"]).name]), "text": r["text"], "kind": "synth",
                           "loader": "ulaw"})
+if CFG["data_mix"] != "both":   # dev keeps both kinds, so every arm is scored on the same dev set
+    rows["train"] = [r for r in rows["train"] if r["kind"] == CFG["data_mix"]]
 print({k: len(v) for k, v in rows.items()})
 
 # %% [markdown]
