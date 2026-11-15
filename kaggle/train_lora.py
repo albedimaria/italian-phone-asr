@@ -1,5 +1,5 @@
 # %% [markdown]
-# # Whisper-small LoRA on 8 kHz G.711 Italian phone speech
+# # Whisper LoRA on 8 kHz G.711 Italian phone speech
 #
 # Kaggle script kernel (GPU T4 x1 or P100). Inputs:
 # - Kaggle secret `MDC_API_KEY`: Mozilla Data Collective key. Common Voice cannot be re-hosted, so the
@@ -7,7 +7,7 @@
 # - Kaggle dataset `ipasr-train` (private, our own data): `train_synth/` mu-law WAVs + manifests +
 #   `cv_subset.json` + `config.json` (hyper-parameters of this round).
 #
-# Output in /kaggle/working: `whisper-small-it-phone/` (LoRA merged into the base weights, ready for
+# Output in /kaggle/working: `<out_name>/` (LoRA merged into the base weights, ready for
 # `pipeline("automatic-speech-recognition")`), `adapter/`, `dev_metrics.json`, checkpoints for resume.
 
 # %%
@@ -24,6 +24,7 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q", "peft>=0.13", "jiw
 import json
 import random
 import tarfile
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -35,16 +36,22 @@ IN = next(p.parent for p in Path("/kaggle/input").rglob("cv_subset.json"))
 WORK = Path("/kaggle/working")
 TMP = Path("/kaggle/tmp")
 TMP.mkdir(parents=True, exist_ok=True)
+# The config lives here, not in the dataset: the API token cannot version datasets (403), so a
+# dataset config.json goes stale. It is printed and saved with the metrics instead.
 CFG = {
-    "round": 1, "lora_r": 32, "lora_alpha": 64, "lora_dropout": 0.05, "target_modules": ["q_proj", "v_proj"],
-    "lr": 1e-3, "epochs": 3, "batch_size": 8, "grad_accum": 2, "synth_fraction": 1.0, "warmup_steps": 100,
-    "eval_steps": 300, "save_steps": 300, "seed": 0,
-    # round 2: keep the checkpoint with the lowest dev WER (generated text), not the lowest eval loss.
-    # Round 1 picked by loss and drifted on a frequent word ("buongiorno" -> "bongiorno") at lr 1e-3.
+    "round": 4, "base": "openai/whisper-large-v3-turbo", "out_name": "whisper-turbo-it-phone",
+    # Rounds 1-3 (whisper-small, LoRA on q/v of encoder AND decoder, lr 1e-3) drifted on spelling
+    # ("bongiorno", "perfecto"): the problem is acoustic, so adapt the encoder only.
+    "lora_r": 32, "lora_alpha": 64, "lora_dropout": 0.05,
+    "target_modules": r"model\.encoder\.layers\.\d+\.(self_attn\.(q_proj|k_proj|v_proj|out_proj)|fc1|fc2)",
+    "lr": 2e-4, "epochs": 3, "batch_size": 4, "grad_accum": 4, "synth_fraction": 1.0, "warmup_steps": 100,
+    "eval_steps": 100, "save_steps": 100, "early_stop_patience": 5, "seed": 0,
+    # keep the checkpoint with the lowest dev WER (generated text), not the lowest eval loss
     "select_by": "wer", "eval_subset": 400,
+    # augmentation: SpecAugment in the encoder + additive noise after the codec on half the train clips
+    "spec_augment": True, "noise_p": 0.5, "noise_snr_db": [15, 35],
+    "max_hours": 10.5,   # Kaggle stops at 12 h: stop training early enough to evaluate and save
 }
-if (IN / "config.json").exists():
-    CFG.update(json.loads((IN / "config.json").read_text()))
 print(CFG)
 random.seed(CFG["seed"]); np.random.seed(CFG["seed"]); torch.manual_seed(CFG["seed"])
 
@@ -129,7 +136,7 @@ print({k: len(v) for k, v in rows.items()})
 # %%
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 
-BASE = "openai/whisper-small"
+BASE = CFG["base"]
 processor = WhisperProcessor.from_pretrained(BASE, language="italian", task="transcribe")
 
 # build the LoRA model before any data work, so a library problem fails in a minute, not after featurizing
@@ -141,6 +148,10 @@ model.generation_config.language = "italian"
 model.generation_config.task = "transcribe"
 model.generation_config.forced_decoder_ids = None
 model.config.use_cache = False
+if CFG["spec_augment"]:
+    model.config.apply_spec_augment = True
+    model.config.mask_time_prob = 0.05
+    model.config.mask_feature_prob = 0.05
 lora = LoraConfig(r=CFG["lora_r"], lora_alpha=CFG["lora_alpha"], lora_dropout=CFG["lora_dropout"],
                   target_modules=CFG["target_modules"], bias="none")
 model = get_peft_model(model, lora)
@@ -151,8 +162,13 @@ model.print_trainable_parameters()
 FEAT = TMP / "features"
 FEAT.mkdir(exist_ok=True)
 
-def _one(r):
+def _one(r, split="train"):
     audio = g711_16k(r["audio"]) if r["loader"] == "g711" else ulaw_16k(r["audio"])
+    rng = np.random.default_rng([zlib.crc32(r["audio"].encode()), CFG["seed"]])
+    if split == "train" and rng.random() < CFG["noise_p"] and audio.size:
+        snr = rng.uniform(*CFG["noise_snr_db"])
+        p = float(np.mean(audio ** 2)) or 1e-8
+        audio = (audio + rng.normal(0, np.sqrt(p / 10 ** (snr / 10)), audio.size)).astype(np.float32)
     if len(audio) > 30 * 16000:
         return None
     x = processor.feature_extractor(audio, sampling_rate=16000, return_tensors="np").input_features[0]
@@ -168,7 +184,7 @@ def featurize(split):
         return torch.load(out, weights_only=False)
     feats = []
     with ThreadPoolExecutor(max_workers=os.cpu_count() * 2) as ex:
-        for k, f in enumerate(ex.map(_one, rows[split], chunksize=32)):
+        for k, f in enumerate(ex.map(lambda r: _one(r, split), rows[split], chunksize=32)):
             if f is not None:
                 feats.append(f)
             if k % 2000 == 0:
@@ -179,7 +195,7 @@ def featurize(split):
 train_feats, dev_feats = featurize("train"), featurize("dev")
 
 # %% [markdown]
-# ## LoRA on q/v projections
+# ## Training
 
 # %%
 class Collator:
@@ -221,9 +237,26 @@ args = Seq2SeqTrainingArguments(
     remove_unused_columns=False, label_names=["labels"], report_to=[], dataloader_num_workers=2,
     load_best_model_at_end=True, metric_for_best_model="eval_wer" if by_wer else "eval_loss",
     greater_is_better=False, predict_with_generate=by_wer, generation_max_length=200,
+    gradient_checkpointing=True, gradient_checkpointing_kwargs={"use_reentrant": False},
 )
+import time
+from transformers import EarlyStoppingCallback, TrainerCallback
+
+T0 = time.time()
+
+
+class TimeLimit(TrainerCallback):
+    def on_step_end(self, args, state, control, **kw):
+        if time.time() - T0 > CFG["max_hours"] * 3600:
+            print("time limit: stopping training", flush=True)
+            control.should_training_stop = True
+        if state.global_step == 20 and torch.cuda.is_available():
+            print("peak GPU memory GB:", round(torch.cuda.max_memory_allocated() / 1e9, 1), flush=True)
+
+
 trainer = Seq2SeqTrainer(model=model, args=args, train_dataset=DS(train_feats), eval_dataset=DS(eval_feats),
-                         data_collator=Collator(), compute_metrics=compute_metrics if by_wer else None)
+                         data_collator=Collator(), compute_metrics=compute_metrics if by_wer else None,
+                         callbacks=[EarlyStoppingCallback(CFG["early_stop_patience"]), TimeLimit()])
 last = None
 if (WORK / "ckpt").exists():
     cks = sorted((WORK / "ckpt").glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[1]))
@@ -246,7 +279,7 @@ def transcribe(feats, bs=16):
         out += processor.batch_decode(ids, skip_special_tokens=True)
     return out
 
-metrics = {"config": CFG}
+metrics = {"config": CFG, "log_history": trainer.state.log_history}
 for kind in ("cv", "synth"):
     sub = [f for f in dev_feats if f["kind"] == kind]
     hyps = transcribe(sub)
@@ -260,6 +293,7 @@ print(json.dumps(metrics, indent=1))
 
 model.save_pretrained(WORK / "adapter")
 merged = model.merge_and_unload()
-merged.save_pretrained(WORK / "whisper-small-it-phone", safe_serialization=True)
-processor.save_pretrained(WORK / "whisper-small-it-phone")
-print("saved", list((WORK / "whisper-small-it-phone").iterdir()))
+OUT = WORK / CFG["out_name"]
+merged.save_pretrained(OUT, safe_serialization=True)
+processor.save_pretrained(OUT)
+print("saved", list(OUT.iterdir()))
