@@ -147,7 +147,8 @@ processor = WhisperProcessor.from_pretrained(BASE, language="italian", task="tra
 from peft import LoraConfig, get_peft_model
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 
-model = WhisperForConditionalGeneration.from_pretrained(BASE)
+# turbo ships fp16 weights and recent transformers keeps that dtype: load fp32, the Trainer does fp16 via AMP
+model = WhisperForConditionalGeneration.from_pretrained(BASE, torch_dtype=torch.float32)
 model.generation_config.language = "italian"
 model.generation_config.task = "transcribe"
 model.generation_config.forced_decoder_ids = None
