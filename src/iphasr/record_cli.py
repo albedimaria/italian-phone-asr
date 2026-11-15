@@ -171,8 +171,8 @@ def fetch(delete_remote: bool = True) -> int:
                 if rs and not t.get("deleted_remote"):
                     try:
                         c.recordings(rs).delete()
-                    except Exception as e:  # already deleted
-                        if "20404" not in str(e):
+                    except Exception as e:  # already deleted (redone takes may be gone): 404 is fine
+                        if getattr(e, "status", None) != 404 and "20404" not in str(e):
                             raise
                     t["deleted_remote"] = True
             save_session(s)
