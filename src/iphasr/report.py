@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .metrics import entity_accuracy, paired_bootstrap, utt_counts
-from .paths import BASE, OURS, RESULTS, SETS, SYSTEMS, manifest_path, read_jsonl, transcript_path
+from .paths import BASE, OURS, RESULTS, SETS, SYSTEMS, data_root, manifest_path, read_jsonl, transcript_path
 
 MIN_SPEAKERS = 5
 MIN_MINUTES = 40.0
@@ -42,6 +42,23 @@ def _pct(x: float) -> str:
     return f"{100 * x:.1f}"
 
 
+LOCAL = ["parakeet-tdt-0.6b-v3", BASE, OURS]
+
+
+def cpu_rtf() -> dict[str, float]:
+    """Real-time factor of the local systems on CPU (processing s / audio s), from usage.jsonl.
+
+    Best (lowest) full run per system: runs on this laptop overlapped with other jobs at times,
+    and the least-contended run is the closest to the model's own speed.
+    """
+    best: dict[str, float] = {}
+    for u in read_jsonl(data_root() / "usage.jsonl"):
+        if u["system"] in LOCAL and u.get("minutes") and u.get("seconds") and u.get("utts", 0) >= 100:
+            r = u["seconds"] / (u["minutes"] * 60)
+            best[u["system"]] = min(r, best.get(u["system"], r))
+    return best
+
+
 def build(n_resamples: int = 10_000) -> tuple[str, list[str]]:
     """Return (markdown, gate_failures)."""
     fails: list[str] = []
@@ -67,8 +84,10 @@ def build(n_resamples: int = 10_000) -> tuple[str, list[str]]:
             else:
                 hyps[(sysname, s)] = rows
 
-    md = ["# Results", "",
-          "WER (%) after the shared Italian normalizer (`src/iphasr/normalize.py`). Lower is better.", ""]
+    md = ["# Results", ""]
+    if fails:
+        md += ["> **Interim.** The gate below is not met yet: empty cells are sets or systems still to run.", ""]
+    md += ["WER (%) after the shared Italian normalizer (`src/iphasr/normalize.py`). Lower is better.", ""]
     sizes = {s: f"{len(manifests[s])} utts" for s in SETS}
     sizes["test_human"] += f", {len(speakers)} speakers, {minutes:.0f} min"
     md += ["| System | " + " | ".join(f"{s} ({sizes[s]})" for s in SETS) + " |",
@@ -83,6 +102,19 @@ def build(n_resamples: int = 10_000) -> tuple[str, list[str]]:
             else:
                 cells.append("—")
         md.append(f"| {label} | " + " | ".join(cells) + " |")
+
+    rtf = cpu_rtf()
+    if rtf:
+        md += ["", "## Speed of the local systems (CPU)", "",
+               "Real-time factor = processing time / audio duration, batch transcription on a laptop CPU, "
+               "best full run. Below 1 is faster than real time.", "",
+               "| System | RTF |", "|---|---:|"]
+        # base and LoRA share the architecture (LoRA is merged): one row, best run of either
+        wh = [rtf[k] for k in (BASE, OURS) if k in rtf]
+        if "parakeet-tdt-0.6b-v3" in rtf:
+            md.append(f"| {SYSTEMS['parakeet-tdt-0.6b-v3']} | {rtf['parakeet-tdt-0.6b-v3']:.2f} |")
+        if wh:
+            md.append(f"| Whisper-small, base and LoRA (same architecture) | {min(wh):.2f} |")
 
     # entity accuracy on test_human
     md += ["", "## Entity accuracy on test_human (%)", "",
