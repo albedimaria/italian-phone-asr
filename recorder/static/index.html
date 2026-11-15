@@ -66,7 +66,7 @@
     <div class="row" style="margin-top:20px">
       <button id="next" disabled>Avanti</button>
       <button id="redo" class="secondary" disabled>Ripeti</button>
-      <button id="hang" class="secondary">Pausa (riattacca)</button>
+      <button id="hang" class="secondary">Pausa</button>
     </div>
     <p class="keys" id="keys"><kbd>Spazio</kbd> avanti · <kbd>R</kbd> ripeti</p>
   </section>
@@ -134,12 +134,16 @@ function finish() {
 async function startCall() {
   $("err").textContent = "";
   $("start").disabled = true;
+  busy = false; expected = null;
   try {
+    if (device) { device.destroy(); device = null; }
     const { token } = await api("voice-token");
     device = new Twilio.Device(token, { codecPreferences: ["pcmu"], logLevel: "warn" });  // G.711 mu-law only
     call = await device.connect({ params: { session: TOKEN } });
     call.on("disconnect", () => { call = null; $("next").disabled = true; $("redo").disabled = true;
-      $("state").className = "pill wait"; $("state").textContent = "Chiamata chiusa: ricarica la pagina per riprendere"; });
+      $("state").className = "pill wait"; $("state").textContent = "In pausa: premi Riprendi";
+      $("hang").textContent = "Riprendi"; });
+    $("hang").textContent = "Pausa";
     call.on("error", (e) => { $("err").textContent = "Errore chiamata: " + e.message; });
     $("intro").hidden = true; $("rec").hidden = false;
   } catch (e) {
@@ -160,7 +164,8 @@ async function startCall() {
   });
   $("next").addEventListener("click", () => press("#"));
   $("redo").addEventListener("click", () => press("*"));
-  $("hang").addEventListener("click", () => { if (call) call.disconnect(); });
+  // one button: pause hangs up the call, resume dials again and the server continues from the last confirmed line
+  $("hang").addEventListener("click", () => { if (call) call.disconnect(); else startCall(); });
   document.addEventListener("keydown", (e) => {
     if ($("rec").hidden) return;
     if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); if (!$("next").disabled) press("#"); }
