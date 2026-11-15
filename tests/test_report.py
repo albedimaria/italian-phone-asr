@@ -23,7 +23,7 @@ def _fill(n_speakers=5, secs=30.0, systems=SYSTEMS):
               "duration": secs, "channel": "browser", "r_moscia": s == 0}
              for s in range(n_speakers) for l in script[:20]]
     write_jsonl(manifest_path("test_human"), human)
-    for s in ("test_cv", "test_collaudio"):
+    for s in [x for x in SETS if x != "test_human"]:
         write_jsonl(manifest_path(s), [{"id": f"{s}{i}", "text": "buongiorno vorrei un appuntamento"} for i in range(10)])
     for sysname in systems:
         p_err = 0.05 if sysname == "whisper-small-it-phone" else 0.3

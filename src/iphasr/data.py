@@ -109,6 +109,24 @@ TRAIN_HOURS, DEV_CLIPS, TEST_HOURS, MAX_PER_SPEAKER = 15.0, 600, 1.0, 25
 AVG_CLIP_S = 5.444  # from the MDC datasheet; real durations are measured on the clips we keep
 
 
+def prepare_cv_g711() -> list[dict]:
+    """test_cv through the phone chain: the same 661 clips, 8 kHz mu-law round trip, 16 kHz WAV.
+
+    The thesis of the project (adaptation to the phone channel) measured on human voices.
+    Every system gets the same G.711-degraded WAV, local and cloud alike.
+    """
+    from .paths import manifest_path, read_jsonl, write_jsonl
+    out_dir = data_root() / "test_cv_g711" / "audio"
+    rows = []
+    for r in read_jsonl(manifest_path("test_cv")):
+        dst = out_dir / (Path(r["audio"]).stem + ".wav")
+        if not dst.exists():
+            g711_chain(Path(r["audio"]), dst)
+        rows.append({**r, "id": r["id"] + "_g711", "audio": str(dst)})
+    write_jsonl(manifest_path("test_cv_g711"), rows)
+    return rows
+
+
 def _read_tsv(data: bytes) -> list[dict]:
     import csv
     import io

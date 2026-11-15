@@ -9,7 +9,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 RESULTS = REPO / "results"
 
-SETS = ["test_human", "test_cv", "test_collaudio"]
+SETS = ["test_human", "test_cv", "test_cv_g711", "test_collaudio"]
 SYSTEMS = {
     "deepgram-nova-3": "Deepgram Nova-3",
     "elevenlabs-scribe": "ElevenLabs Scribe v3",

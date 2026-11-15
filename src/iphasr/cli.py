@@ -24,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("n", type=int)
     p.add_argument("--seed", type=int, default=0)
     p = sub.add_parser("prepare", help="build a test/train manifest under the data root")
-    p.add_argument("set", choices=["test_collaudio", "cv"])
+    p.add_argument("set", choices=["test_collaudio", "cv", "test_cv_g711"])
     p = sub.add_parser("run", help="transcribe a test set with one system (cached, resumable)")
     p.add_argument("system")
     p.add_argument("set")
@@ -51,6 +51,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.set == "cv":
             from .data import prepare_cv
             print(prepare_cv())
+            return 0
+        if args.set == "test_cv_g711":
+            from .data import prepare_cv_g711
+            rows = prepare_cv_g711()
+            print(f"test_cv_g711: {len(rows)} utts, {sum(r['duration'] for r in rows) / 60:.1f} min")
             return 0
         from .data import prepare_collaudio
         rows = prepare_collaudio()
