@@ -127,6 +127,32 @@ def prepare_cv_g711() -> list[dict]:
     return rows
 
 
+SYNTH_ENT_SRC = Path("D:/data/italian-phone-asr/kaggle/tts_chatterbox")
+
+
+def prepare_synth_entities(src: Path = SYNTH_ENT_SRC) -> list[dict]:
+    """test_synth_entities: Chatterbox output of the held-out sentences through the same G.711 chain.
+
+    Synthetic and declared as such: it measures entities (prices, dates, times, plates, names, phone
+    numbers) with templates, values and a voice never seen in training. No round-trip filter: an ASR
+    filter keeps only what that ASR already gets right (T6). Misread clips are found by listening.
+    """
+    import soundfile as sf
+
+    from .paths import manifest_path, read_jsonl, write_jsonl
+    out_dir = data_root() / "test_synth_entities" / "audio"
+    rows = []
+    for it in read_jsonl(src / "sentences.jsonl"):
+        wav = src / "wav" / f"{it['id']}.wav"
+        dst = out_dir / f"{it['id']}.wav"
+        if not dst.exists():
+            g711_chain(wav, dst)
+        rows.append({"id": f"se_{it['id']}", "audio": str(dst), "text": it["text"], "entities": it["entities"],
+                     "duration": sf.info(str(dst)).duration, "speaker": "chatterbox-default"})
+    write_jsonl(manifest_path("test_synth_entities"), rows)
+    return rows
+
+
 def _read_tsv(data: bytes) -> list[dict]:
     import csv
     import io
