@@ -19,6 +19,11 @@ metric, then tries to fix them with a small, cheap fine-tune.
   kept only if Parakeet transcribes them back within 10% WER.
 - **Model**: LoRA (r 32) on the attention and feed-forward layers of the encoder only. The problem is
   acoustic; adapting the decoder too (Whisper-small rounds 1–3) drifted the spelling of common words.
+- **Training**: Kaggle, two T4s in DataParallel, batch 4 per GPU × 2 GPUs × 4 accumulation steps =
+  effective batch 32, fp16, lr 2e-4, 3 epochs (1,116 steps); checkpoint chosen by WER on the dev set only.
+  Round 4 stopped on Kaggle's time limit at step 600 (1.6 epochs); round 5 resumes it from that checkpoint
+  with optimizer and scheduler state. The data ablation (Common Voice only / synthetic only / both) was
+  not run: at ~55 s per step one arm costs more than a week's GPU quota allows.
 - **Decoding**: the same for base and fine-tuned, with Whisper's guards against repetition loops
   (temperature fallback, compression-ratio and log-prob thresholds). Without them the base model looped
   "Grazie a tutti." for 267 words on one clip, and that single clip moved its WER from 6.4% to 10.7%.
