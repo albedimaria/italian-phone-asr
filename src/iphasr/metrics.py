@@ -120,3 +120,39 @@ def paired_bootstrap(
     wa, wb = ea.sum() / n.sum(), eb.sum() / n.sum()
     lo, hi = np.quantile(rels, [alpha / 2, 1 - alpha / 2])
     return BootstrapResult(float(wa), float(wb), float((wa - wb) / wa), float(lo), float(hi), len(n), n_resamples)
+
+
+def paired_bootstrap_2way(
+    errors_a: np.ndarray, errors_b: np.ndarray, ref_lens: np.ndarray,
+    speakers: list[str], sentences: list[str],
+    n_resamples: int = 10_000, seed: int = 0, alpha: float = 0.05,
+) -> BootstrapResult:
+    """Paired two-way bootstrap for a crossed design (every speaker reads the same script).
+
+    The same sentences read by several speakers are not independent observations, and neither are
+    the sentences of one speaker: resampling utterances gives too narrow an interval. Each resample
+    draws speakers and sentences independently, with replacement, and keeps every (speaker, sentence)
+    cell of the draw, weighted by how many times its speaker and its sentence were drawn.
+    """
+    ea, eb, n = (np.asarray(x, dtype=np.int64) for x in (errors_a, errors_b, ref_lens))
+    if not (len(ea) == len(eb) == len(n) == len(speakers) == len(sentences)) or len(n) == 0:
+        raise ValueError("arrays must be non-empty and equal length")
+    if n.sum() == 0 or ea.sum() == 0:
+        raise ValueError("baseline has no errors or no reference words: relative reduction undefined")
+    spk = {s: i for i, s in enumerate(sorted(set(speakers)))}
+    sen = {s: i for i, s in enumerate(sorted(set(sentences)))}
+    S, L = len(spk), len(sen)
+    ma, mb = np.zeros((S, L)), np.zeros((S, L))     # missing cells (a sentence a speaker skipped) stay 0
+    for k, (s, t) in enumerate(zip(speakers, sentences)):
+        ma[spk[s], sen[t]] += ea[k]
+        mb[spk[s], sen[t]] += eb[k]
+    rng = np.random.default_rng(seed)
+    cs = np.stack([np.bincount(rng.integers(0, S, S), minlength=S) for _ in range(n_resamples)])   # (R, S)
+    cl = np.stack([np.bincount(rng.integers(0, L, L), minlength=L) for _ in range(n_resamples)])   # (R, L)
+    sa = np.einsum("rs,sl,rl->r", cs, ma, cl)
+    sb = np.einsum("rs,sl,rl->r", cs, mb, cl)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rels = np.where(sa > 0, (sa - sb) / sa, 0.0)
+    wa, wb = ea.sum() / n.sum(), eb.sum() / n.sum()
+    lo, hi = np.quantile(rels, [alpha / 2, 1 - alpha / 2])
+    return BootstrapResult(float(wa), float(wb), float((wa - wb) / wa), float(lo), float(hi), len(n), n_resamples)

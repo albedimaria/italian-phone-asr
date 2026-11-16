@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .metrics import entity_accuracy, paired_bootstrap, utt_counts
+from .metrics import entity_accuracy, paired_bootstrap, paired_bootstrap_2way, utt_counts
 from .paths import BASE, OURS, RESULTS, SETS, SYSTEMS, data_root, manifest_path, read_jsonl, transcript_path
 
 MIN_SPEAKERS = 5
@@ -134,12 +134,28 @@ def build(n_resamples: int = 10_000) -> tuple[str, list[str]]:
     md += ["", "## Fine-tuned vs base on test_human", ""]
     if (BASE, "test_human") in scored and (OURS, "test_human") in scored:
         a, b = scored[(BASE, "test_human")], scored[(OURS, "test_human")]
-        r = paired_bootstrap(a.errors, b.errors, a.ref_lens, n_resamples=n_resamples)
+        by_id = {r["id"]: r for r in human}
+        # every speaker reads the same script: resample speakers AND sentences, not utterances
+        r = paired_bootstrap_2way(a.errors, b.errors, a.ref_lens,
+                                  [by_id[i]["speaker"] for i in a.ids], [by_id[i]["text"] for i in a.ids],
+                                  n_resamples=n_resamples)
+        r1 = paired_bootstrap(a.errors, b.errors, a.ref_lens, n_resamples=n_resamples)
         passed = r.rel_reduction >= TARGET_REL and r.ci_low > 0
         md += [f"- WER base {_pct(r.wer_a)}% → fine-tuned {_pct(r.wer_b)}%",
                f"- relative reduction **{_pct(r.rel_reduction)}%**, 95% CI [{_pct(r.ci_low)}%, {_pct(r.ci_high)}%] "
-               f"(paired bootstrap over {r.n_utts} utterances, {r.n_resamples} resamples)",
-               f"- target ≥ {_pct(TARGET_REL)}% with CI lower bound > 0: **{'MET' if passed else 'NOT MET'}**"]
+               f"(paired two-way bootstrap over speakers and sentences, {r.n_utts} utterances, "
+               f"{r.n_resamples} resamples)",
+               f"- for reference, utterance-level bootstrap (too narrow for a shared script): "
+               f"CI [{_pct(r1.ci_low)}%, {_pct(r1.ci_high)}%]",
+               f"- target ≥ {_pct(TARGET_REL)}% with two-way CI lower bound > 0: **{'MET' if passed else 'NOT MET'}**"]
+        spk_rows = []
+        for s in sorted({by_id[i]["speaker"] for i in a.ids}):
+            keep = [k for k, i in enumerate(a.ids) if by_id[i]["speaker"] == s]
+            ea, eb, nn = a.errors[keep].sum(), b.errors[keep].sum(), a.ref_lens[keep].sum()
+            rel = (ea - eb) / ea if ea else float("nan")
+            spk_rows.append(f"| {s} | {_pct(ea / nn)} | {_pct(eb / nn)} | {_pct(rel)} |")
+        md += ["", "| Speaker | base WER % | fine-tuned WER % | relative reduction % |", "|---|---:|---:|---:|",
+               *spk_rows]
     else:
         md.append("- not available (missing transcripts)")
 

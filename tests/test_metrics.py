@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from iphasr.metrics import corpus_wer, entity_accuracy, entity_hit, paired_bootstrap, utt_counts
+from iphasr.metrics import (corpus_wer, entity_accuracy, entity_hit, paired_bootstrap, paired_bootstrap_2way,
+                            utt_counts)
 
 
 def test_wer_known_cases():
@@ -79,3 +80,37 @@ def test_bootstrap_noise_ci_spans_zero():
 def test_bootstrap_is_deterministic():
     e1, e2, n = np.array([2, 1, 3]), np.array([1, 1, 2]), np.array([6, 5, 7])
     assert paired_bootstrap(e1, e2, n, seed=7) == paired_bootstrap(e1, e2, n, seed=7)
+
+
+def _crossed(n_spk=5, n_sen=100, seed=0):
+    """Every speaker reads every sentence; B is better than A only for speaker 0."""
+    rng = np.random.default_rng(seed)
+    spk, sen, ea, eb, n = [], [], [], [], []
+    for s in range(n_spk):
+        for t in range(n_sen):
+            a = int(rng.integers(0, 4))
+            spk.append(f"s{s}"); sen.append(f"t{t}"); n.append(10)
+            ea.append(a); eb.append(0 if s == 0 else a)
+    return np.array(ea), np.array(eb), np.array(n), spk, sen
+
+
+def test_bootstrap_2way_identical_systems_is_zero():
+    ea, _, n, spk, sen = _crossed()
+    r = paired_bootstrap_2way(ea, ea, n, spk, sen, n_resamples=2000)
+    assert r.rel_reduction == 0 and r.ci_low == 0 and r.ci_high == 0
+
+
+def test_bootstrap_2way_is_wider_when_one_speaker_drives_the_gain():
+    ea, eb, n, spk, sen = _crossed()
+    one = paired_bootstrap(ea, eb, n, n_resamples=5000)
+    two = paired_bootstrap_2way(ea, eb, n, spk, sen, n_resamples=5000)
+    assert abs(one.rel_reduction - two.rel_reduction) < 1e-12
+    assert one.ci_low > 0                               # utterance bootstrap: "significant"
+    assert two.ci_low <= 0 < two.ci_high                # speaker resampling: the gain may be one speaker
+    assert (two.ci_high - two.ci_low) > 2 * (one.ci_high - one.ci_low)
+
+
+def test_bootstrap_2way_rejects_mismatched_lengths():
+    ea, eb, n, spk, sen = _crossed()
+    with pytest.raises(ValueError):
+        paired_bootstrap_2way(ea, eb, n, spk[:-1], sen)
