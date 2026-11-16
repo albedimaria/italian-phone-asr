@@ -194,8 +194,10 @@ def add_parser(sub) -> None:
     q.add_argument("--r-moscia", action="store_true")
     q = rs.add_parser("call"); q.add_argument("token"); q.add_argument("to")
     q = rs.add_parser("fetch"); q.add_argument("--keep-remote", action="store_true")
-    q = rs.add_parser("review", help="listen to a speaker's takes and confirm what was said (local page)")
-    q.add_argument("speaker"); q.add_argument("--port", type=int, default=8732)
+    q = rs.add_parser("review", help="listen to takes and confirm what was said (local page)")
+    q.add_argument("speaker", nargs="?", help="omit to review every take of the set")
+    q.add_argument("--set", dest="set_name", choices=["test_human", "test_synth_entities"], default="test_human")
+    q.add_argument("--port", type=int, default=8732)
 
 
 def run(args) -> int:
@@ -211,5 +213,5 @@ def run(args) -> int:
         return fetch(not args.keep_remote)
     if args.rcmd == "review":
         from .review import serve as review_serve
-        return review_serve(args.speaker, args.port)
+        return review_serve(args.speaker, args.port, args.set_name)
     return 2

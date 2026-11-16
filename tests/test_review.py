@@ -47,3 +47,23 @@ def test_review_app_saves_verdict_and_rewrites_manifest(tmp_path, monkeypatch):
     m = read_jsonl(manifest_path("test_human"))[0]
     assert m["verified"] and m["text"].startswith("ci vediamo") and m["script_text"] == ROW["text"]
     assert c.post("/api/verify", json={"id": "nope", "said": "x"}).status_code == 400
+
+
+def test_synth_entities_review_is_separate_and_worst_first(tmp_path, monkeypatch):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from iphasr.paths import transcript_path
+    monkeypatch.setenv("IPASR_DATA", str(tmp_path))
+    wav = tmp_path / "a.wav"; wav.write_bytes(b"RIFF")
+    rows = [{"id": f"se_{k}", "speaker": "chatterbox-default", "audio": str(wav), "text": "costa 240,99 euro",
+             "entities": [{"type": "prezzo", "text": "240,99 euro"}]} for k in ("a", "b")]
+    write_jsonl(manifest_path("test_synth_entities"), rows)
+    write_jsonl(transcript_path("whisper-large-v3-turbo", "test_synth_entities"),
+                [{"id": "se_a", "hyp": "costa 240,99 euro"}, {"id": "se_b", "hyp": "costa duecento"}])
+    c = TestClient(review.create_review_app(None, "test_synth_entities"))
+    got = c.get("/api/rows").json()
+    assert [r["id"] for r in got] == ["se_b", "se_a"] and got[0]["worst"] > got[1]["worst"]
+    assert c.post("/api/verify", json={"id": "se_b", "said": "costa 240,99"}).json()["ok"]
+    m = {r["id"]: r for r in read_jsonl(manifest_path("test_synth_entities"))}
+    assert m["se_b"]["verified"] and m["se_b"]["entities"] == []     # "euro" not said: entity not scorable
+    assert review.load_verified("test_human") == {}                   # test_human verdicts untouched

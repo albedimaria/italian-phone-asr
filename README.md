@@ -37,6 +37,8 @@ metric, then tries to fix them with a small, cheap fine-tune.
   - `test_collaudio`: caller channel of real phone calls with TTS voices.
   - `test_synth_entities` (in progress): 200 held-out entity sentences (templates, car models and names never
     used in training) read by a TTS voice that is not in the training set. Synthetic, declared as such.
+    The TTS can skip or misread a word, so its references go through the same listening check
+    (`bench record review --set test_synth_entities`), worst clips first by the highest WER of any system.
 - **Metrics**
   - WER after one Italian normalizer for reference and hypothesis (numbers to words with `num2words`,
     prices, times, dates, phone numbers digit by digit). Unit-tested, because this is where systems that

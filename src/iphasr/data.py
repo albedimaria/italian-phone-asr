@@ -149,6 +149,9 @@ def prepare_synth_entities(src: Path = SYNTH_ENT_SRC) -> list[dict]:
             g711_chain(wav, dst)
         rows.append({"id": f"se_{it['id']}", "audio": str(dst), "text": it["text"], "entities": it["entities"],
                      "duration": sf.info(str(dst)).duration, "speaker": "chatterbox-default"})
+    from .review import apply_verified, load_verified
+    verified = load_verified("test_synth_entities")   # listening check: reference = what the TTS said
+    rows = [apply_verified(r, verified) for r in rows]
     write_jsonl(manifest_path("test_synth_entities"), rows)
     return rows
 
