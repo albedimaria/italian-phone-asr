@@ -1,0 +1,14 @@
+{
+  "id": "holasoyalberto/italian-phone-asr-infer-turbo",
+  "title": "italian-phone-asr-infer-turbo",
+  "code_file": "infer_turbo.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": ["holasoyalberto/whisper-small-it-phone-lora"]
+}

@@ -108,18 +108,32 @@ CLOUD = {"deepgram-nova-3": deepgram, "elevenlabs-scribe": elevenlabs, "openai-g
 
 # --- local ---------------------------------------------------------------------------
 
+# Whisper's standard guards against repetition loops (the base turbo looped "Grazie a tutti." for
+# 267 words on one test_cv_g711 clip). Same for base and fine-tuned; kept identical to
+# kaggle/infer/infer_turbo.py, which runs the GPU side of the bench.
+WHISPER_GEN = dict(language="italian", task="transcribe", max_new_tokens=200,
+                   temperature=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0), compression_ratio_threshold=1.35,
+                   logprob_threshold=-1.0, no_speech_threshold=0.6, condition_on_prev_tokens=False)
+
+
 class Whisper:
     def __init__(self, model: str):
         import torch
-        from transformers import pipeline
-        torch.set_num_threads(max(1, os.cpu_count() - 1))
-        self.pipe = pipeline("automatic-speech-recognition", model=model, device="cpu", torch_dtype=torch.float32)
+        from transformers import AutoProcessor, WhisperForConditionalGeneration
+        # physical cores, not logical: SMT threads slow the matmuls down on a 6-core laptop CPU
+        torch.set_num_threads(max(1, (os.cpu_count() or 2) // 2))
+        self.torch = torch
+        self.proc = AutoProcessor.from_pretrained(model)
+        self.model = WhisperForConditionalGeneration.from_pretrained(model, torch_dtype=torch.float32).eval()
 
     def batch(self, paths: list[str]) -> list[str]:
-        audio = [{"raw": load_16k(p), "sampling_rate": 16000} for p in paths]
-        out = self.pipe(audio, batch_size=len(audio), chunk_length_s=30,
-                        generate_kwargs={"language": "italian", "task": "transcribe"})
-        return [o["text"].strip() for o in out]
+        # clips are < 30 s: one window each, no chunking pipeline
+        feats = self.proc([load_16k(p) for p in paths], sampling_rate=16000, return_tensors="pt",
+                          return_attention_mask=True)
+        with self.torch.no_grad():
+            ids = self.model.generate(input_features=feats.input_features, attention_mask=feats.attention_mask,
+                                      **WHISPER_GEN)
+        return [t.strip() for t in self.proc.batch_decode(ids, skip_special_tokens=True)]
 
 
 class Parakeet:
