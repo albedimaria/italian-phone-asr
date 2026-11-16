@@ -176,6 +176,9 @@ def fetch(delete_remote: bool = True) -> int:
                             raise
                     t["deleted_remote"] = True
             save_session(s)
+    from .review import apply_verified, load_verified
+    verified = load_verified()   # listening check (bench record review): reference = what was said
+    rows = [apply_verified(r, verified) for r in rows]
     write_jsonl(manifest_path("test_human"), rows)
     spk = {r["speaker"] for r in rows}
     print(f"test_human: {len(rows)} utts, {len(spk)} speakers, {sum(r['duration'] for r in rows) / 60:.1f} min")
@@ -191,6 +194,8 @@ def add_parser(sub) -> None:
     q.add_argument("--r-moscia", action="store_true")
     q = rs.add_parser("call"); q.add_argument("token"); q.add_argument("to")
     q = rs.add_parser("fetch"); q.add_argument("--keep-remote", action="store_true")
+    q = rs.add_parser("review", help="listen to a speaker's takes and confirm what was said (local page)")
+    q.add_argument("speaker"); q.add_argument("--port", type=int, default=8732)
 
 
 def run(args) -> int:
@@ -204,4 +209,7 @@ def run(args) -> int:
         return call(args.token, args.to)
     if args.rcmd == "fetch":
         return fetch(not args.keep_remote)
+    if args.rcmd == "review":
+        from .review import serve as review_serve
+        return review_serve(args.speaker, args.port)
     return 2

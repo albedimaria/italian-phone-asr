@@ -90,7 +90,8 @@ def build(n_resamples: int = 10_000) -> tuple[str, list[str]]:
         md += ["> **Interim.** The gate below is not met yet: empty cells are sets or systems still to run.", ""]
     md += ["WER (%) after the shared Italian normalizer (`src/iphasr/normalize.py`). Lower is better.", ""]
     sizes = {s: f"{len(manifests[s])} utts" for s in SETS}
-    sizes["test_human"] += f", {len(speakers)} speakers, {minutes:.0f} min"
+    n_ver = sum(bool(r.get("verified")) for r in human)
+    sizes["test_human"] += f", {len(speakers)} speakers, {minutes:.0f} min, {n_ver} references verified by listening"
     md += ["| System | " + " | ".join(f"{s} ({sizes[s]})" for s in SETS) + " |",
            "|---|" + "---:|" * len(SETS)]
     scored: dict[tuple[str, str], Scored] = {}
