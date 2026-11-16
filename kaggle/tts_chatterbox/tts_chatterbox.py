@@ -34,8 +34,8 @@ from iphasr.synth import generate_heldout
 WORK = Path("/kaggle/working"); OUT = WORK / "wav"; OUT.mkdir(parents=True, exist_ok=True)
 items = generate_heldout()
 torch.manual_seed(0)
-model = ChatterboxMultilingualTTS.from_pretrained(device="cuda", t3_model="v3")
-print("torch", torch.__version__, "sr", model.sr, "items", len(items), flush=True)
+model = ChatterboxMultilingualTTS.from_pretrained(device="cuda")  # PyPI release: no t3_model arg
+import importlib.metadata as md; print("chatterbox", md.version("chatterbox-tts"), "torch", torch.__version__, "sr", model.sr, "items", len(items), flush=True)
 t0 = time.time()
 for k, it in enumerate(items):
     wav = model.generate(it["tts_text"], language_id="it")
