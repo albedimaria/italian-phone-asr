@@ -43,6 +43,7 @@ def _pct(x: float) -> str:
 
 
 LOCAL = ["parakeet-tdt-0.6b-v3", BASE, OURS]
+ARCH = "Whisper-large-v3-turbo"
 
 
 def cpu_rtf() -> dict[str, float]:
@@ -114,7 +115,7 @@ def build(n_resamples: int = 10_000) -> tuple[str, list[str]]:
         if "parakeet-tdt-0.6b-v3" in rtf:
             md.append(f"| {SYSTEMS['parakeet-tdt-0.6b-v3']} | {rtf['parakeet-tdt-0.6b-v3']:.2f} |")
         if wh:
-            md.append(f"| Whisper-small, base and LoRA (same architecture) | {min(wh):.2f} |")
+            md.append(f"| {ARCH}, base and LoRA (same architecture) | {min(wh):.2f} |")
 
     # entity accuracy on test_human
     md += ["", "## Entity accuracy on test_human (%)", "",

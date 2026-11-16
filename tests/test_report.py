@@ -5,7 +5,7 @@ import random
 import pytest
 
 from iphasr import report
-from iphasr.paths import SETS, SYSTEMS, manifest_path, transcript_path, write_jsonl
+from iphasr.paths import OURS, SETS, SYSTEMS, manifest_path, transcript_path, write_jsonl
 from iphasr.script import load_script
 
 
@@ -26,7 +26,7 @@ def _fill(n_speakers=5, secs=30.0, systems=SYSTEMS):
     for s in [x for x in SETS if x != "test_human"]:
         write_jsonl(manifest_path(s), [{"id": f"{s}{i}", "text": "buongiorno vorrei un appuntamento"} for i in range(10)])
     for sysname in systems:
-        p_err = 0.05 if sysname == "whisper-small-it-phone" else 0.3
+        p_err = 0.05 if sysname == OURS else 0.3
         for s in SETS:
             rows = []
             for r in (human if s == "test_human" else [{"id": f"{s}{i}", "text": "buongiorno vorrei un appuntamento"} for i in range(10)]):

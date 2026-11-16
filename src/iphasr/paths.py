@@ -15,10 +15,12 @@ SYSTEMS = {
     "elevenlabs-scribe": "ElevenLabs Scribe v3",
     "openai-gpt-transcribe": "OpenAI gpt-transcribe",
     "parakeet-tdt-0.6b-v3": "NVIDIA Parakeet-TDT-0.6B-v3",
-    "whisper-small": "Whisper-small (base)",
-    "whisper-small-it-phone": "Whisper-small + LoRA (ours)",
+    "whisper-large-v3-turbo": "Whisper-large-v3-turbo (base)",
+    "whisper-turbo-it-phone": "Whisper-large-v3-turbo + encoder LoRA (ours)",
 }
-BASE, OURS = "whisper-small", "whisper-small-it-phone"
+# Rounds 1-3 used whisper-small (13.5% WER on test_cv before any training): kept as history in the
+# README and in transcripts/, no longer a row of the benchmark.
+BASE, OURS = "whisper-large-v3-turbo", "whisper-turbo-it-phone"
 
 
 def data_root() -> Path:

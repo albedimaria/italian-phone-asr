@@ -136,6 +136,10 @@ def local_model(system: str, model_path: str | None = None):
         return Whisper("openai/whisper-small")
     if system == "whisper-small-it-phone":
         return Whisper(model_path or os.environ.get("IPASR_FT_MODEL", str(MODELS_DIR / "whisper-small-it-phone")))
+    if system == "whisper-large-v3-turbo":
+        return Whisper("openai/whisper-large-v3-turbo")
+    if system == "whisper-turbo-it-phone":
+        return Whisper(model_path or os.environ.get("IPASR_FT_MODEL", str(MODELS_DIR / "whisper-turbo-it-phone")))
     if system == "parakeet-tdt-0.6b-v3":
         return Parakeet()
     raise KeyError(system)
