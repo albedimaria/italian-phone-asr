@@ -5,7 +5,8 @@
 # Chatterbox multilingual (resemble-ai/chatterbox, MIT), default voice, on a Kaggle GPU.
 # Sentences: iphasr.synth.generate_heldout() from the public repo (held-out templates, cars, names).
 # The TTS reads `tts_text` (numbers spelled out); the reference is the written `text`.
-# Chatterbox pins torch 2.6, which breaks the image's torchvision: it runs in its own uv venv.
+# Chatterbox pins torch 2.6, which breaks the image's torchvision: it runs in its own uv venv, pinned to
+# 0.1.7 (smoke-tested locally on one sentence). Its watermarker (perth) imports pkg_resources: setuptools<81.
 # Output: /kaggle/working/wav/<id>.wav (model rate, 16-bit) + sentences.jsonl. The G.711 chain is
 # applied locally, identical to test_cv_g711.
 
@@ -21,7 +22,7 @@ py = str(VENV / "bin" / "python")
 # editable clone, not a wheel: the generator reads data/script/copione.txt (test values it must avoid)
 subprocess.run(["git", "clone", "-q", "--depth", "1", "https://github.com/albedimaria/italian-phone-asr.git",
                 "/kaggle/tmp/repo"], check=True)
-subprocess.run(["uv", "pip", "install", "--python", py, "-q", "chatterbox-tts", "num2words>=0.5.14", "jiwer>=3.1",
+subprocess.run(["uv", "pip", "install", "--python", py, "-q", "chatterbox-tts==0.1.7", "setuptools<81", "num2words>=0.5.14", "jiwer>=3.1",
                 "-e", "/kaggle/tmp/repo"], check=True)
 
 WORKER = r'''
