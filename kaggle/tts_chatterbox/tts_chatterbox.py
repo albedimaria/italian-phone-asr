@@ -18,8 +18,11 @@ VENV = Path("/kaggle/tmp/cb")
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "uv"], check=True)
 subprocess.run(["uv", "venv", str(VENV), "--python", "3.11"], check=True)
 py = str(VENV / "bin" / "python")
+# editable clone, not a wheel: the generator reads data/script/copione.txt (test values it must avoid)
+subprocess.run(["git", "clone", "-q", "--depth", "1", "https://github.com/albedimaria/italian-phone-asr.git",
+                "/kaggle/tmp/repo"], check=True)
 subprocess.run(["uv", "pip", "install", "--python", py, "-q", "chatterbox-tts", "num2words>=0.5.14", "jiwer>=3.1",
-                "git+https://github.com/albedimaria/italian-phone-asr.git"], check=True)
+                "-e", "/kaggle/tmp/repo"], check=True)
 
 WORKER = r'''
 import json, time
