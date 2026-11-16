@@ -10,8 +10,8 @@ WER (%) after the shared Italian normalizer (`src/iphasr/normalize.py`). Lower i
 | ElevenLabs Scribe v3 | — | 1.8 | 2.3 | 0.3 |
 | OpenAI gpt-transcribe | — | 3.1 | 3.6 | 0.2 |
 | NVIDIA Parakeet-TDT-0.6B-v3 | — | 3.3 | 4.0 | 0.6 |
-| Whisper-small (base) | — | 13.5 | 15.5 | 1.1 |
-| Whisper-small + LoRA (ours) | — | 12.7 | 14.9 | 1.3 |
+| Whisper-large-v3-turbo (base) | — | 6.1 | 6.9 | — |
+| Whisper-large-v3-turbo + encoder LoRA (ours) | — | 4.7 | 5.5 | — |
 
 ## Speed of the local systems (CPU)
 
@@ -20,7 +20,7 @@ Real-time factor = processing time / audio duration, batch transcription on a la
 | System | RTF |
 |---|---:|
 | NVIDIA Parakeet-TDT-0.6B-v3 | 0.11 |
-| Whisper-small, base and LoRA (same architecture) | 0.26 |
+| Whisper-large-v3-turbo, base and LoRA (same architecture) | 2.19 |
 
 ## Entity accuracy on test_human (%)
 
@@ -32,8 +32,8 @@ An entity is correct when its normalized form appears contiguously in the normal
 | ElevenLabs Scribe v3 | — | — | — | — | — | — | — | — |
 | OpenAI gpt-transcribe | — | — | — | — | — | — | — | — |
 | NVIDIA Parakeet-TDT-0.6B-v3 | — | — | — | — | — | — | — | — |
-| Whisper-small (base) | — | — | — | — | — | — | — | — |
-| Whisper-small + LoRA (ours) | — | — | — | — | — | — | — | — |
+| Whisper-large-v3-turbo (base) | — | — | — | — | — | — | — | — |
+| Whisper-large-v3-turbo + encoder LoRA (ours) | — | — | — | — | — | — | — | — |
 
 ## Fine-tuned vs base on test_human
 
@@ -52,5 +52,7 @@ An entity is correct when its normalized form appears contiguously in the normal
 - elevenlabs-scribe on test_human: all transcripts missing
 - openai-gpt-transcribe on test_human: all transcripts missing
 - parakeet-tdt-0.6b-v3 on test_human: all transcripts missing
-- whisper-small on test_human: all transcripts missing
-- whisper-small-it-phone on test_human: all transcripts missing
+- whisper-large-v3-turbo on test_human: all transcripts missing
+- whisper-large-v3-turbo on test_collaudio: all transcripts missing
+- whisper-turbo-it-phone on test_human: all transcripts missing
+- whisper-turbo-it-phone on test_collaudio: all transcripts missing
