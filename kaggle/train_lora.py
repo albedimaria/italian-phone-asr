@@ -39,7 +39,7 @@ TMP.mkdir(parents=True, exist_ok=True)
 # The config lives here, not in the dataset: the API token cannot version datasets (403), so a
 # dataset config.json goes stale. It is printed and saved with the metrics instead.
 CFG = {
-    "round": 4, "base": "openai/whisper-large-v3-turbo", "out_name": "whisper-turbo-it-phone",
+    "round": 5, "base": "openai/whisper-large-v3-turbo", "out_name": "whisper-turbo-it-phone",
     # Rounds 1-3 (whisper-small, LoRA on q/v of encoder AND decoder, lr 1e-3) drifted on spelling
     # ("bongiorno", "perfecto"): the problem is acoustic, so adapt the encoder only.
     "lora_r": 32, "lora_alpha": 64, "lora_dropout": 0.05,
@@ -56,6 +56,10 @@ CFG = {
 }
 print(CFG)
 random.seed(CFG["seed"]); np.random.seed(CFG["seed"]); torch.manual_seed(CFG["seed"])
+# Kaggle's "T4" accelerator is two T4s and the Trainer wraps the model in DataParallel: batch 4 per GPU x 2
+# GPUs x accum 4 = effective batch 32. Round 5 resumes round 4, so the batch must match: with one GPU it would
+# halve silently and steps, epochs and the LR schedule would no longer line up.
+assert torch.cuda.device_count() == 2, f"expected 2 GPUs (effective batch 32), got {torch.cuda.device_count()}"
 
 # %% [markdown]
 # ## Common Voice IT: download once per session, extract only the subset
@@ -262,6 +266,17 @@ class TimeLimit(TrainerCallback):
 trainer = Seq2SeqTrainer(model=model, args=args, train_dataset=DS(train_feats), eval_dataset=DS(eval_feats),
                          data_collator=Collator(), compute_metrics=compute_metrics if by_wer else None,
                          callbacks=[EarlyStoppingCallback(CFG["early_stop_patience"]), TimeLimit()])
+# Round 5 = resume of round 4 (stopped by the time limit at step 600 of 1116, 1.6 of 3 epochs). The attached
+# kernel output holds ckpt/checkpoint-500 and -600 with optimizer, scheduler, scaler and RNG state: copy the
+# whole folder (the best-checkpoint pointer in trainer_state.json refers to it) and resume from the latest.
+import shutil
+if not (WORK / "ckpt").exists():
+    prev = next((p.parent for p in Path("/kaggle/input").rglob("checkpoint-600") if p.parent.name == "ckpt"), None)
+    assert prev is not None, "round 4 ckpt/checkpoint-600 not found in /kaggle/input"
+    for f in ("optimizer.pt", "scheduler.pt", "trainer_state.json", "adapter_model.safetensors"):
+        assert (prev / "checkpoint-600" / f).exists(), f"checkpoint-600 lacks {f}: not a resumable checkpoint"
+    shutil.copytree(prev, WORK / "ckpt")
+    print("resuming from", sorted(p.name for p in (WORK / "ckpt").iterdir()), flush=True)
 last = None
 if (WORK / "ckpt").exists():
     cks = sorted((WORK / "ckpt").glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[1]))

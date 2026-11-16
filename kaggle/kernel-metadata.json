@@ -1,6 +1,6 @@
 {
-  "id": "holasoyalberto/whisper-small-it-phone-lora",
-  "title": "whisper-small-it-phone-lora",
+  "id": "holasoyalberto/italian-phone-asr-train",
+  "title": "italian-phone-asr-train",
   "code_file": "train_lora.py",
   "language": "python",
   "kernel_type": "script",
@@ -10,5 +10,5 @@
   "machine_shape": "NvidiaTeslaT4",
   "dataset_sources": ["holasoyalberto/ipasr-train-r3"],
   "competition_sources": [],
-  "kernel_sources": []
+  "kernel_sources": ["holasoyalberto/whisper-small-it-phone-lora"]
 }
