@@ -86,6 +86,49 @@ TEMPLATES = [
     "Va bene, passo io il {data} a firmare.",
     "Ricordo che l'accordo era di {prezzo} più IVA.",
 ]
+# --- test_synth_entities (held out): templates, cars and names never used in training --------
+# A synthetic entity test set read by a TTS voice that is not in train_synth either (Chatterbox).
+# Phrasing, car models and names are disjoint from TEMPLATES/CARS/FIRST/LAST and from the test
+# script; tests/test_leak.py checks it.
+HELDOUT_CARS = [
+    "Fiat Doblò", "Peugeot 308", "Renault Austral", "Renault Twingo", "Toyota RAV4", "Toyota Aygo X",
+    "Opel Grandland", "Ford Ranger", "Kia Niro", "Kia Ceed", "Hyundai Bayon", "Nissan Micra",
+    "Skoda Karoq", "Seat Arona", "Seat Leon", "Suzuki Ignis", "Audi A3", "BMW Serie 1", "Mercedes GLA",
+    "Alfa Romeo Giulia", "Volkswagen Taigo", "Mazda MX-5", "Jeep Wrangler", "Volvo XC60",
+    "Citroën C5 Aircross", "Subaru Forester", "Mitsubishi Space Star", "Lexus UX",
+]
+HELDOUT_FIRST = [
+    "Roberta", "Veronica", "Cristina", "Antonio", "Ludovica", "Edoardo", "Rebecca", "Leonardo",
+    "Carlotta", "Jacopo", "Margherita", "Samuele", "Viola", "Mattia", "Ginevra", "Raffaele",
+]
+HELDOUT_LAST = [
+    "Santoro", "Giordano", "Lombardi", "Ferraro", "Palumbo", "Valentini", "Guerra", "Bernardi",
+    "Caputo", "Messina", "Coppola", "Mariani", "De Santis", "Parisi", "Sorrentino", "Donati",
+]
+HELDOUT_TEMPLATES = [
+    "Avrei visto in vetrina una {auto}, posso venire a provarla?",
+    "Mi ha passato il suo contatto {nome}, è lei che segue l'usato?",
+    "Me la lascia a {prezzo} se pago in contanti?",
+    "Va bene {weekday} {data}, mi raccomando puntuali.",
+    "Riesco a esserci verso le {orario}, non prima.",
+    "Annoti il mio cellulare, {telefono}, mi chiami pure quando vuole.",
+    "La macchina vecchia è una {auto} del {anno} con {km} chilometri.",
+    "Per il tagliando mi avete chiesto {prezzo}, mi pare tanto.",
+    "Posso spostare l'appuntamento del {data} alle {orario}?",
+    "Chieda pure di {nome}, mi trova in amministrazione.",
+    "Sulla {auto} il finanziamento parte da {prezzo} al mese?",
+    "Il numero fisso dell'ufficio è {telefono}.",
+    "L'ho comprata nel {anno} e ha fatto {km} chilometri.",
+    "Il carro attrezzi passa il {data} tra le {orario} e le {orario}.",
+    "Con la rottamazione la {auto} quanto verrebbe?",
+    "Si tratta della pratica a nome {nome}, quella del {data}.",
+    "Ho già versato una caparra di {prezzo}.",
+    "Mi richiami dopo le {orario} al {telefono}, per favore.",
+    "Cercavo una {auto} usata sotto i {prezzo}.",
+    "Il ritiro è confermato per {weekday} alle {orario}.",
+]
+HELDOUT_POOLS = {"auto": HELDOUT_CARS, "first": HELDOUT_FIRST, "last": HELDOUT_LAST}
+
 _SLOT = re.compile(r"\{(\w+)\}")
 
 # Round 3: phone openers/closers. Round 1-2 had none, and the fine-tuned model lost Whisper's
@@ -146,12 +189,13 @@ def _phone(rng: random.Random) -> str:
     return f"{p} {rng.randrange(100, 1000)} {rng.randrange(1000, 10000)}"
 
 
-def _fill(slot: str, rng: random.Random) -> tuple[str, str | None]:
+def _fill(slot: str, rng: random.Random, pools: dict | None = None) -> tuple[str, str | None]:
     """Return (written value, entity type or None)."""
+    cars, first, last = (pools["auto"], pools["first"], pools["last"]) if pools else (CARS, FIRST, LAST)
     if slot == "auto":
-        return rng.choice(CARS), "auto"
+        return rng.choice(cars), "auto"
     if slot == "nome":
-        return (f"{rng.choice(FIRST)} {rng.choice(LAST)}" if rng.random() < 0.8 else rng.choice(LAST)), "nome"
+        return (f"{rng.choice(first)} {rng.choice(last)}" if rng.random() < 0.8 else rng.choice(last)), "nome"
     if slot == "prezzo":
         return _price(rng), "prezzo"
     if slot == "data":
@@ -169,17 +213,19 @@ def _fill(slot: str, rng: random.Random) -> tuple[str, str | None]:
     raise KeyError(slot)
 
 
-def generate(n: int, seed: int = 0, wrap: bool = True) -> list[dict]:
+def generate(n: int, seed: int = 0, wrap: bool = True, templates: list[str] | None = None,
+             pools: dict | None = None, prefix: str = "synth") -> list[dict]:
     rng = random.Random(seed)
+    templates = templates or TEMPLATES
     wrap_rng = random.Random(seed + 10_000)  # separate stream: unwrapped items stay identical to round 1-2
     block = test_blocklist()
     out = []
     while len(out) < n:
-        tpl = rng.choice(TEMPLATES)
+        tpl = rng.choice(templates)
         written, spoken, ents = tpl, tpl, []
         for slot in _SLOT.findall(tpl):
             for _ in range(50):
-                val, typ = _fill(slot, rng)
+                val, typ = _fill(slot, rng, pools)
                 nv = normalize(val)
                 padded = f" {nv} "
                 # multi-token test values must not appear inside a synth value; single tokens only exactly
@@ -191,6 +237,11 @@ def generate(n: int, seed: int = 0, wrap: bool = True) -> list[dict]:
             spoken = spoken.replace("{" + slot + "}", normalize(val) if typ else val, 1)
             if typ:
                 ents.append({"type": typ, "text": val})
-        item = {"id": f"synth{len(out):05d}", "text": written, "tts_text": spoken, "entities": ents}
+        item = {"id": f"{prefix}{len(out):05d}", "text": written, "tts_text": spoken, "entities": ents}
         out.append(_wrap(item, wrap_rng) if wrap else item)
     return out
+
+
+def generate_heldout(n: int = 200, seed: int = 7) -> list[dict]:
+    """test_synth_entities sentences: held-out templates and pools, no phone wrapper."""
+    return generate(n, seed=seed, wrap=False, templates=HELDOUT_TEMPLATES, pools=HELDOUT_POOLS, prefix="sent")

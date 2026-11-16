@@ -60,3 +60,26 @@ def test_generated_corpus_has_no_test_entities_or_phrasing():
 def test_synth_written_and_spoken_agree():
     for s in generate(500, seed=3):
         assert normalize(s["text"]) == normalize(s["tts_text"]), s
+
+
+def test_heldout_entity_set_is_disjoint_from_training():
+    from iphasr.synth import HELDOUT_CARS, HELDOUT_FIRST, HELDOUT_LAST, HELDOUT_TEMPLATES, TEMPLATES, generate_heldout
+    norm = lambda xs: {normalize(x) for x in xs}
+    assert not norm(HELDOUT_CARS) & norm(CARS)
+    assert not norm(HELDOUT_FIRST + HELDOUT_LAST) & norm(FIRST + LAST)
+    assert not set(HELDOUT_TEMPLATES) & set(TEMPLATES)
+    test_cars = {normalize(e["text"]) for l in load_script() for e in l.entities if e["type"] == "auto"}
+    assert not test_cars & norm(HELDOUT_CARS)
+    vocab = set(" ".join(normalize(l.text) for l in load_script()).split())
+    for name in HELDOUT_FIRST + HELDOUT_LAST:
+        for tok in normalize(name).split():
+            assert tok not in vocab, f"held-out name token {tok!r} appears in the test script"
+    # no held-out sentence shares a phrasing n-gram with the training corpus
+    train_grams: set = set()
+    for s in generate(4000, seed=0):
+        train_grams |= _ngrams(normalize(s["text"]).split(), N_GRAM)
+    for s in generate_heldout():
+        # runs of random digits (phone numbers, with one connective like "e") are values, not phrasing
+        shared = {g for g in _ngrams(normalize(s["text"]).split(), N_GRAM) & train_grams
+                  if sum(x in DIGIT_WORDS for x in g) < len(g) - 1}
+        assert not shared, f"held-out phrasing seen in training ({s['id']}): {shared}"
