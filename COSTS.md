@@ -16,8 +16,11 @@ Trial or prepaid credits already owned are logged at $0 out-of-pocket, with the 
 | 2026-11-15 | test_cv_g711, 68.5 min | Deepgram nova-3 | 68.5 min | 0.0043/min | 0.29 | |
 | 2026-11-15 | test_cv_g711, 68.5 min | ElevenLabs scribe_v3 | 68.5 min | 0.22/h | 0.25 | billed as plan credits (Creator) |
 | 2026-11-15 | test_cv_g711, 68.5 min | OpenAI gpt-transcribe | 68.5 min | 0.0045/min | 0.31 | |
+| 2026-11-16 | test_synth_entities, 15.0 min | Deepgram nova-3 | 15.0 min | 0.0043/min | 0.06 | |
+| 2026-11-16 | test_synth_entities, 15.0 min | ElevenLabs scribe_v3 | 15.0 min | 0.22/h | 0.06 | billed as plan credits (Creator) |
+| 2026-11-16 | test_synth_entities, 15.0 min | OpenAI gpt-transcribe | 0 min | 0.0045/min | 0.00 | not run: API credit balance exhausted (429) |
 
-**Total out-of-pocket: $2.16 / $25.00**
+**Total out-of-pocket: $2.28 / $25.00**
 
 ## Price references (checked 2026-11-11)
 - Twilio Programmable Voice, outbound to Italy mobile from a US number: $0.0476/min (Pricing API v2, `Voice/Countries/IT`).
