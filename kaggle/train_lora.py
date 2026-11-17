@@ -269,8 +269,11 @@ trainer = Seq2SeqTrainer(model=model, args=args, train_dataset=DS(train_feats), 
 # Round 5 = resume of round 4 (stopped by the time limit at step 600 of 1116, 1.6 of 3 epochs). The attached
 # kernel output holds ckpt/checkpoint-500 and -600 with optimizer, scheduler, scaler and RNG state: copy the
 # whole folder (the best-checkpoint pointer in trainer_state.json refers to it) and resume from the latest.
+# Round 5 bug: the check was `not (WORK / "ckpt").exists()`, but the Trainer above already creates its
+# output_dir, so the copy was skipped and round 5 trained from step 0. Check for checkpoints, not the folder,
+# and fail loudly if a resume round would start from scratch.
 import shutil
-if not (WORK / "ckpt").exists():
+if not any((WORK / "ckpt").glob("checkpoint-*")):
     prev = next((p.parent for p in Path("/kaggle/input").rglob("checkpoint-600") if p.parent.name == "ckpt"), None)
     assert prev is not None, "round 4 ckpt/checkpoint-600 not found in /kaggle/input"
     for f in ("optimizer.pt", "scheduler.pt", "trainer_state.json", "adapter_model.safetensors"):
@@ -281,6 +284,7 @@ last = None
 if (WORK / "ckpt").exists():
     cks = sorted((WORK / "ckpt").glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[1]))
     last = str(cks[-1]) if cks else None
+assert last is not None, "resume round with no checkpoint: refusing to train from step 0"
 trainer.train(resume_from_checkpoint=last)
 
 # %% [markdown]

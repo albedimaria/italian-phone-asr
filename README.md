@@ -21,8 +21,10 @@ metric, then tries to fix them with a small, cheap fine-tune.
   acoustic; adapting the decoder too (Whisper-small rounds 1–3) drifted the spelling of common words.
 - **Training**: Kaggle, two T4s in DataParallel, batch 4 per GPU × 2 GPUs × 4 accumulation steps =
   effective batch 32, fp16, lr 2e-4, 3 epochs (1,116 steps); checkpoint chosen by WER on the dev set only.
-  Round 4 stopped on Kaggle's time limit at step 600 (1.6 epochs); round 5 resumes it from that checkpoint
-  with optimizer and scheduler state. The data ablation (Common Voice only / synthetic only / both) was
+  Round 4 stopped on Kaggle's time limit at step 600 (1.6 epochs). Round 5 was meant to resume it, but a bug
+  in the resume check restarted training from step 0; it stopped at step 688 and was worse on the full dev set
+  (5.1% vs 4.6% WER), so the model chosen on dev is round 4. On `test_cv_g711` round 4 reaches 5.5% WER
+  against 6.9% for the base, still behind base Parakeet at 4.0%: the turbo line stops here. The data ablation (Common Voice only / synthetic only / both) was
   not run: at ~55 s per step each arm takes about 17 GPU hours, and three arms exceed Kaggle's 30 h weekly quota.
 - **Decoding**: the same for base and fine-tuned, with Whisper's guards against repetition loops
   (temperature fallback, compression-ratio and log-prob thresholds). Without them the base model looped
