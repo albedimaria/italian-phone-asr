@@ -26,6 +26,7 @@ import time
 import zlib
 from pathlib import Path
 
+SESSION_T0 = time.time()   # GPU quota counts from session start, not from train()
 SMOKE = bool(os.environ.get("IPASR_SMOKE"))
 if not SMOKE:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "nemo_toolkit[asr]", "jiwer>=3.1",
@@ -38,7 +39,7 @@ CFG = {
     "round": "parakeet-1", "base": "nvidia/parakeet-tdt-0.6b-v3", "out_name": "parakeet-tdt-it-phone",
     "freeze_lower_layers": 12, "lr": 1e-4, "weight_decay": 1e-3, "warmup_steps": 100, "min_lr": 1e-6,
     "epochs": 3, "batch_size": 4, "grad_accum": 4, "eval_every": 200, "early_stop_patience": 5, "seed": 0,
-    "noise_p": 0.5, "noise_snr_db": [15, 35], "max_duration": 20.0, "max_hours": 10.0, "num_workers": 4,
+    "noise_p": 0.5, "noise_snr_db": [15, 35], "max_duration": 20.0, "max_hours": 2.6, "num_workers": 4,  # max_hours: ~3 h of weekly GPU quota left, leave time to save
 }
 print(CFG, flush=True)
 random.seed(CFG["seed"]); np.random.seed(CFG["seed"])
@@ -143,7 +144,7 @@ def train(train_man: Path, dev_cv: list[dict], dev_synth: list[dict], work: Path
 
         def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
             step = trainer.global_step
-            if time.time() - t0 > CFG["max_hours"] * 3600:
+            if time.time() - SESSION_T0 > CFG["max_hours"] * 3600:
                 print("time limit: stopping training", flush=True)
                 trainer.should_stop = True
             if step == 20 and accelerator == "gpu":
