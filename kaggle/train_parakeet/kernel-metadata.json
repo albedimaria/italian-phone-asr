@@ -1,0 +1,14 @@
+{
+  "id": "holasoyalberto/italian-phone-asr-train-parakeet",
+  "title": "italian-phone-asr-train-parakeet",
+  "code_file": "train_parakeet.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": ["holasoyalberto/ipasr-train-r3"],
+  "competition_sources": [],
+  "kernel_sources": []
+}
